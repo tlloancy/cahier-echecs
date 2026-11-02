@@ -69,6 +69,7 @@ let treeCache: { key: string; games: LightGame[]; root: TreeNode } | null = null
 let loadAbort: AbortController | null = null
 let countryAbort: AbortController | null = null
 let analysisJob = 0
+let analysisAbort: AbortController | null = null
 let engine: Engine | null = null
 const app = document.querySelector('#app') as HTMLElement
 
@@ -117,7 +118,12 @@ function currentView(): { games: LightGame[]; root: TreeNode; node: TreeNode } {
     const games = selectGames(state.games, state.filters, state.countries)
     treeCache = { key, games, root: buildTree(games, state.book) }
   }
-  state.path = clampPath(treeCache.root, state.path)
+  const clamped = clampPath(treeCache.root, state.path)
+  const extendsTree =
+    clamped.length > 0 &&
+    clamped.length < state.path.length &&
+    state.path.slice(0, clamped.length).every((san, index) => san === clamped[index])
+  if (!extendsTree) state.path = clamped
   return { games: treeCache.games, root: treeCache.root, node: nodeAt(treeCache.root, state.path) }
 }
 
@@ -150,6 +156,7 @@ function moveLabel(ply: number, san: string): string {
 }
 
 function findingList(mark: string, label: string, hint: string, rows: Finding[], empty: string, kind: 'faille' | 'decisif'): string {
+  if (!rows.length && !empty) return ''
   const items = rows.length
     ? rows
         .map((row) => {
@@ -163,6 +170,38 @@ function findingList(mark: string, label: string, hint: string, rows: Finding[],
         .join('')
     : `<li class="muted">${esc(empty)}</li>`
   return `<section class="findings"><h2 class="icon-title">${mark}<span>${esc(label)}</span></h2><p class="note">${esc(hint)}</p><ul class="finding-list">${items}</ul></section>`
+}
+
+function loupeSection(): string {
+  const analysis = state.analysis
+  if (!analysis) return ''
+  const stop = analysis.running
+    ? `<button type="button" class="icon stop" id="stop-analysis" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>`
+    : ''
+  const failles = findingList(
+    icons.alert,
+    'Failles',
+    'Un coup moins bon, à n’importe quel moment de la partie.',
+    analysis.failles,
+    analysis.running ? '' : 'Aucune faille dans ces parties.',
+    'faille',
+  )
+  const decisifs = findingList(
+    icons.spark,
+    'Coups décisifs',
+    'Tu donnes du matériel, et c’est quand même le bon coup.',
+    analysis.decisifs,
+    analysis.running ? '' : 'Aucun dans ces parties.',
+    'decisif',
+  )
+  return `<section class="panel loupe" id="loupe">
+      <div class="toolbar">
+        <h2 class="icon-title">${icons.search}<span>Loupe</span></h2>
+        ${stop}
+      </div>
+      <p id="loupe-status" class="status ${analysis.running ? 'running' : ''}" role="status">${esc(analysis.status)}</p>
+      ${failles}${decisifs}
+    </section>`
 }
 
 function dashboard(): string {
@@ -221,14 +260,6 @@ function dashboard(): string {
         })
         .join('')}</ul>`
     : '<p class="muted">Aucune ligne épinglée.</p>'
-  const analysis = state.analysis
-  const analysisHtml = analysis
-    ? `<div id="analysis">
-        <p id="analysis-status" class="status ${analysis.running ? 'running' : ''}">${esc(analysis.status)}</p>
-        ${findingList(icons.alert, 'Failles', 'Un coup moins bon dans les huit premiers. Pas celui qui perd la partie plus tard.', analysis.failles, 'Aucune faille dans ces parties.', 'faille')}
-        ${findingList(icons.spark, 'Coups décisifs', 'Tu donnes du matériel, et c’est quand même le bon coup.', analysis.decisifs, 'Aucun dans ces parties.', 'decisif')}
-      </div>`
-    : ''
   const oppActive = state.filters.opp
   const base = tallyOf(selectGames(state.games, { ...state.filters, result: 'all' }, state.countries))
   const endings = { mate: 0, resign: 0, time: 0 }
@@ -288,6 +319,7 @@ function dashboard(): string {
       </div>
       <button type="button" class="icon" id="flip" aria-label="${state.flip ? 'Côté blancs' : 'Retourner l’échiquier'}" title="${state.flip ? 'Côté blancs' : 'Retourner'}">${icons.flip}</button>
     </div>
+    ${loupeSection()}
     <section class="panel countries">
       <div class="toolbar">
         <h2 title="Pays">Pays</h2>
@@ -301,17 +333,16 @@ function dashboard(): string {
           <h2>${node.name ? esc(node.name) : 'Ouvertures'}</h2>
           <span class="toolbar-actions">
             ${state.path.length ? `<button type="button" class="icon pin" id="pin-here" aria-pressed="${pinnedHere ? 'true' : 'false'}" aria-label="${pinnedHere ? 'Retirer cette ligne' : 'Épingler cette ligne'}" title="${pinnedHere ? 'Retirer' : 'Épingler'}">${icons.pin}</button>` : ''}
-            ${state.path.length ? (state.analysis?.running ? `<button type="button" class="icon stop" id="stop-analysis" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : `<button type="button" class="icon primary" id="analyze" aria-label="Huit premiers coups de quelques parties" title="Huit premiers coups de quelques parties">${icons.search}</button>`) : ''}
+            ${state.path.length && !state.analysis?.running ? `<button type="button" class="icon primary" id="analyze" aria-label="Parcourir toute la partie" title="Parcourir toute la partie">${icons.search}</button>` : ''}
           </span>
         </div>
-        <p class="note">Douze premiers coups à l’écran. La loupe s’arrête au huitième : elle ne voit pas le coup qui fait basculer après.</p>
+        <p class="note">Douze premiers coups à l’écran. La loupe parcourt toute la partie, pendant que tu continues.</p>
         ${state.path.length ? `<p class="position-name">${esc(state.path.join(' '))}</p>` : ''}
         <nav class="crumbs">${crumbs}</nav>
         <div class="opening-grid">
           <div class="tree">${tree}</div>
           ${boardHtml(state.path, state.flip)}
         </div>
-        ${analysisHtml}
       </section>
       <div class="side">
         <section class="panel">
@@ -542,36 +573,90 @@ async function load(username: string): Promise<void> {
   }
 }
 
+function rememberFinding(kind: 'faille' | 'decisif', row: Finding): void {
+  if (!state.analysis) return
+  const list = kind === 'faille' ? state.analysis.failles : state.analysis.decisifs
+  list.push(row)
+  if (kind === 'faille') list.sort((a, b) => b.cpl - a.cpl)
+  list.splice(8)
+  refreshLoupe()
+}
+
+function refreshLoupe(): void {
+  const host = document.getElementById('loupe')
+  const html = loupeSection()
+  if (!host) {
+    if (html) render()
+    return
+  }
+  host.outerHTML = html
+  bindLoupe()
+}
+
+function openFinding(button: HTMLButtonElement): void {
+  const line = button.dataset.line || ''
+  const ply = Number(button.dataset.ply || 0)
+  state.path = line.split(' ').slice(0, ply)
+  render()
+}
+
+function stopAnalysis(): void {
+  analysisJob += 1
+  analysisAbort?.abort()
+  engine?.stop()
+  if (state.analysis) {
+    state.analysis.running = false
+    state.analysis.status = 'Analyse arrêtée.'
+  }
+  refreshLoupe()
+}
+
+function bindLoupe(): void {
+  document.getElementById('stop-analysis')?.addEventListener('click', stopAnalysis)
+  for (const button of document.querySelectorAll<HTMLButtonElement>('#loupe .finding')) {
+    button.addEventListener('click', () => openFinding(button))
+  }
+}
+
 async function startAnalysis(): Promise<void> {
   if (!state.path.length || !state.user) return
   const line = pathKey(state.path)
   const job = ++analysisJob
+  analysisAbort?.abort()
+  const controller = new AbortController()
+  analysisAbort = controller
   state.analysis = { line, running: true, status: 'Démarrage du moteur…', failles: [], decisifs: [] }
   render()
+  document.getElementById('loupe')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   try {
     if (!engine) engine = new Engine(engineUrl())
     const { games } = currentView()
-    const result = await analyzeLine(games, state.path, engine, {
+    const result = await analyzeLine(games, state.path, state.book, engine, {
+      signal: controller.signal,
       stopped: () => job !== analysisJob,
       onProgress: (text) => {
         if (job !== analysisJob || !state.analysis) return
         state.analysis.status = text
-        const slot = document.getElementById('analysis-status')
+        const slot = document.getElementById('loupe-status')
         if (slot) slot.textContent = text
+        else refreshLoupe()
+      },
+      onFinding: (kind, row) => {
+        if (job !== analysisJob || !state.analysis) return
+        rememberFinding(kind, row)
       },
     })
     if (job !== analysisJob || !state.analysis) return
     state.analysis.running = false
     state.analysis.failles = result.failles
     state.analysis.decisifs = result.decisifs
-    state.analysis.status = 'Huit parties récentes, profondeur 6.'
-    render()
-    document.getElementById('analysis')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    state.analysis.status = 'Terminé.'
+    refreshLoupe()
   } catch (error) {
     if (job !== analysisJob || !state.analysis) return
     state.analysis.running = false
     state.analysis.status = error instanceof Error ? error.message : 'L’analyse s’est arrêtée.'
-    render()
+    refreshLoupe()
   }
 }
 
@@ -621,15 +706,7 @@ function bind(): void {
     document.getElementById('analysis-status')?.replaceChildren()
     void startAnalysis()
   })
-  document.getElementById('stop-analysis')?.addEventListener('click', () => {
-    analysisJob += 1
-    engine?.stop()
-    if (state.analysis) {
-      state.analysis.running = false
-      state.analysis.status = 'Analyse arrêtée.'
-    }
-    render()
-  })
+  bindLoupe()
   document.getElementById('clear-country')?.addEventListener('click', () => {
     state.filters.country = null
     render()
@@ -654,14 +731,6 @@ function bind(): void {
   }
   for (const button of app.querySelectorAll<HTMLButtonElement>('[data-drop]')) {
     button.addEventListener('click', () => togglePin(button.dataset.drop || ''))
-  }
-  for (const button of app.querySelectorAll<HTMLButtonElement>('.finding')) {
-    button.addEventListener('click', () => {
-      const line = button.dataset.line || ''
-      const ply = Number(button.dataset.ply || 0)
-      state.path = line.split(' ').slice(0, ply)
-      render()
-    })
   }
   for (const button of app.querySelectorAll<HTMLButtonElement>('[data-opp]')) {
     button.addEventListener('click', () => {

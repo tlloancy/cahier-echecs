@@ -3,13 +3,14 @@ import type { Color } from 'chessops/types'
 import { makeFen } from 'chessops/fen'
 import { makeSan, parseSan } from 'chessops/san'
 import { parseUci } from 'chessops/util'
+import { ensureMoves } from './api.ts'
+import { writeGame } from './db.ts'
 import { Engine, whiteCentipawns } from './engine.ts'
 import { gamesOnLine } from './stats.ts'
-import type { Finding, LightGame } from './types.ts'
+import type { Book, Finding, LightGame } from './types.ts'
 
 const DEPTH = 6
 const SAMPLE = 8
-const MAX_PLY = 16
 const FAILLE_CP = 150
 const SACRIFICE = 2
 
@@ -24,11 +25,22 @@ function material(pos: Chess, color: Color): number {
   return total
 }
 
+function moveLabel(ply: number, san: string): string {
+  const move = Math.ceil(ply / 2)
+  return ply % 2 === 1 ? `${move}. ${san}` : `${move}… ${san}`
+}
+
 export async function analyzeLine(
   games: LightGame[],
   path: string[],
+  book: Book,
   engine: Engine,
-  hooks: { onProgress: (text: string) => void; stopped: () => boolean },
+  hooks: {
+    signal: AbortSignal
+    stopped: () => boolean
+    onProgress: (text: string) => void
+    onFinding: (kind: 'faille' | 'decisif', row: Finding) => void
+  },
 ): Promise<{ failles: Finding[]; decisifs: Finding[] }> {
   const sample = gamesOnLine(games, path).slice(0, SAMPLE)
   const failles: Finding[] = []
@@ -38,22 +50,40 @@ export async function analyzeLine(
   for (let index = 0; index < sample.length; index += 1) {
     if (hooks.stopped()) break
     const game = sample[index]
-    hooks.onProgress(`Partie ${index + 1} / ${sample.length}`)
+    const where = `Partie ${index + 1} sur ${sample.length} · ${game.opp}`
+    hooks.onProgress(game.moves ? where : `${where} · lecture des coups`)
+    const hadMoves = Boolean(game.moves)
+    let moves = game.line
+    try {
+      moves = await ensureMoves(game, book, hooks.signal)
+      if (!hadMoves && game.moves) await writeGame(game)
+    } catch (error) {
+      if (hooks.stopped() || (error instanceof DOMException && error.name === 'AbortError')) break
+    }
+    if (hooks.stopped()) break
     const pos = Chess.default()
     const side: Color = game.color === 'w' ? 'white' : 'black'
     const other: Color = side === 'white' ? 'black' : 'white'
     let ply = 0
-    for (const san of game.line.split(' ')) {
+    for (const san of moves.split(' ')) {
       if (hooks.stopped()) break
       const move = parseSan(pos, san)
       if (!move) break
       ply += 1
-      if (pos.turn === side && ply <= MAX_PLY) {
+      if (pos.turn === side) {
+        hooks.onProgress(`${where} · ${moveLabel(ply, san)}`)
         const before = pos.clone()
-        const answer = await engine.best(makeFen(before.toSetup()), DEPTH)
+        let answer: Awaited<ReturnType<Engine['best']>> | null = null
+        try {
+          answer = await engine.best(makeFen(before.toSetup()), DEPTH)
+        } catch {
+          if (hooks.stopped()) break
+          pos.play(move)
+          continue
+        }
         if (hooks.stopped()) break
-        const bestMove = parseUci(answer.uci)
-        if (bestMove) {
+        const bestMove = answer ? parseUci(answer.uci) : null
+        if (bestMove && answer) {
           const bestSan = makeSan(before, bestMove)
           const after = before.clone()
           after.play(move)
@@ -63,17 +93,36 @@ export async function analyzeLine(
               material(after, side) -
               (material(before, other) - material(after, other))
             if (net >= SACRIFICE) {
-              decisifs.push({ url: game.url, opp: game.opp, ply, san, best: bestSan, cpl: 0, line: game.line })
+              const row: Finding = { url: game.url, opp: game.opp, ply, san, best: bestSan, cpl: 0, line: moves }
+              decisifs.push(row)
+              hooks.onFinding('decisif', row)
             }
           } else {
-            const follow = await engine.best(makeFen(after.toSetup()), DEPTH)
-            if (hooks.stopped()) break
+            let follow: Awaited<ReturnType<Engine['best']>> | null = null
+            try {
+              follow = await engine.best(makeFen(after.toSetup()), DEPTH)
+            } catch {
+              if (hooks.stopped()) break
+              pos.play(move)
+              continue
+            }
+            if (hooks.stopped() || !follow) break
             const loss =
               side === 'white'
                 ? whiteCentipawns(answer) - whiteCentipawns(follow)
                 : whiteCentipawns(follow) - whiteCentipawns(answer)
             if (loss >= FAILLE_CP) {
-              failles.push({ url: game.url, opp: game.opp, ply, san, best: bestSan, cpl: Math.round(loss), line: game.line })
+              const row: Finding = {
+                url: game.url,
+                opp: game.opp,
+                ply,
+                san,
+                best: bestSan,
+                cpl: Math.round(loss),
+                line: moves,
+              }
+              failles.push(row)
+              hooks.onFinding('faille', row)
             }
           }
         }

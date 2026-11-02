@@ -76,6 +76,11 @@ export async function writeUser(user: string, games: LightGame[], display: strin
   await database.put('pins', pins, user)
 }
 
+export async function writeGame(game: LightGame): Promise<void> {
+  const database = await db()
+  await database.put('games', game)
+}
+
 export async function writePins(user: string, pins: string[]): Promise<void> {
   const database = await db()
   await database.put('pins', pins, user)

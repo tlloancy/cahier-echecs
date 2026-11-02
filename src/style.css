@@ -293,6 +293,9 @@ button.icon.pin[aria-pressed="true"] { color: var(--wax); background: #fff6f2; b
 .toolbar { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
 .toolbar h2 { margin: 0; }
 .note { color: var(--muted); margin: 0.35rem 0 0; }
+.loupe { margin-top: 1rem; }
+.loupe .status { margin: 0.4rem 0 0; font-size: 1.05rem; }
+.loupe .status.running { color: var(--ink); }
 .position-name { color: var(--muted); margin: 0.35rem 0 0; }
 .pin-row .text-btn {
   display: flex;

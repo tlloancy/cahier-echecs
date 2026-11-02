@@ -14,6 +14,7 @@ export interface LightGame {
   opp: string
   end: number
   line: string
+  moves?: string
   opening: string
   url: string
 }

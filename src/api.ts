@@ -59,7 +59,7 @@ async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
   throw new Error(last || 'Chess.com limite le rythme. Réessaie dans un instant.')
 }
 
-function readLine(pgn: string, book: Book): { line: string; opening: string } | null {
+function readLine(pgn: string, book: Book): { line: string; moves: string; opening: string } | null {
   const game = parsePgn(pgn)[0]
   if (!game) return null
   const setup = startingPosition(game.headers)
@@ -69,15 +69,41 @@ function readLine(pgn: string, book: Book): { line: string; opening: string } | 
   const sans: string[] = []
   let opening = ''
   for (const node of game.moves.mainline()) {
-    if (sans.length >= MAX_PLIES) break
     const move = parseSan(pos, node.san)
     if (!move) break
     sans.push(makeSanAndPlay(pos, move))
-    const hit = book[epd(pos)]
-    if (hit) opening = hit.name
+    if (sans.length <= MAX_PLIES) {
+      const hit = book[epd(pos)]
+      if (hit) opening = hit.name
+    }
   }
   if (sans.length === 0) return null
-  return { line: sans.join(' '), opening: opening || 'Autre' }
+  return { line: sans.slice(0, MAX_PLIES).join(' '), moves: sans.join(' '), opening: opening || 'Autre' }
+}
+
+const monthGames = new Map<string, ApiGame[]>()
+
+export async function ensureMoves(game: LightGame, book: Book, signal: AbortSignal): Promise<string> {
+  if (game.moves) return game.moves
+  if (!game.end || !game.url) return game.line
+  const date = new Date(game.end * 1000)
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const key = `${game.user}/${year}/${month}`
+  let list = monthGames.get(key)
+  if (!list) {
+    const data = await getJson<{ games?: ApiGame[] }>(
+      `https://api.chess.com/pub/player/${encodeURIComponent(game.user)}/games/${year}/${month}`,
+      signal,
+    )
+    list = data.games || []
+    monthGames.set(key, list)
+  }
+  const raw = list.find((item) => item.url === game.url)
+  const played = raw?.pgn ? readLine(raw.pgn, book) : null
+  if (!played) return game.line
+  game.moves = played.moves
+  return game.moves
 }
 
 function toLight(raw: ApiGame, user: string, book: Book, index: number): LightGame | null {
@@ -118,6 +144,7 @@ function toLight(raw: ApiGame, user: string, book: Book, index: number): LightGa
     opp: opp || 'inconnu',
     end: raw.end_time || 0,
     line: played.line,
+    moves: played.moves,
     opening: played.opening,
     url,
   }
