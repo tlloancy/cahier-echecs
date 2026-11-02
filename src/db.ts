@@ -15,18 +15,38 @@ interface CahierDB extends DBSchema {
     key: string
     value: string[]
   }
+  countries: {
+    key: string
+    value: string
+  }
 }
 
 let database: Promise<IDBPDatabase<CahierDB>> | null = null
+let blockedHandler: (() => void) | null = null
+
+export function onDatabaseBlocked(handler: () => void): void {
+  blockedHandler = handler
+}
 
 function db(): Promise<IDBPDatabase<CahierDB>> {
   if (!database) {
-    database = openDB<CahierDB>('cahier-echecs', 1, {
-      upgrade(store) {
-        const games = store.createObjectStore('games', { keyPath: 'id' })
-        games.createIndex('byUser', 'user')
-        store.createObjectStore('meta')
-        store.createObjectStore('pins')
+    database = openDB<CahierDB>('cahier-echecs', 2, {
+      upgrade(store, oldVersion) {
+        if (oldVersion < 1) {
+          const games = store.createObjectStore('games', { keyPath: 'id' })
+          games.createIndex('byUser', 'user')
+          store.createObjectStore('meta')
+          store.createObjectStore('pins')
+        }
+        if (oldVersion < 2) store.createObjectStore('countries')
+      },
+      blocked() {
+        blockedHandler?.()
+      },
+      blocking(_oldVersion, _newVersion, event) {
+        const connection = event.target
+        if (connection instanceof IDBDatabase) connection.close()
+        database = null
       },
     })
   }
@@ -59,4 +79,22 @@ export async function writeUser(user: string, games: LightGame[], display: strin
 export async function writePins(user: string, pins: string[]): Promise<void> {
   const database = await db()
   await database.put('pins', pins, user)
+}
+
+export async function readCountries(names: string[]): Promise<Record<string, string>> {
+  const database = await db()
+  const found: Record<string, string> = {}
+  const tx = database.transaction('countries')
+  for (const name of names) {
+    const key = name.toLowerCase()
+    const code = await tx.store.get(key)
+    if (code) found[key] = code
+  }
+  await tx.done
+  return found
+}
+
+export async function writeCountry(name: string, code: string): Promise<void> {
+  const database = await db()
+  await database.put('countries', code, name.toLowerCase())
 }

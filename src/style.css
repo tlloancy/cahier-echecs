@@ -264,10 +264,11 @@ button.icon.pin[aria-pressed="true"] { color: var(--wax); background: #fff6f2; b
 
 .side { display: grid; gap: 1rem; }
 .opp-list, .pin-list, .finding-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
+.flag-slot { width: 18px; height: 14px; display: block; }
+.flag { width: 18px; height: 14px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px rgba(30, 26, 22, 0.25); display: block; }
 .opp, .pin-row {
   width: 100%;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 0.5rem;
   align-items: center;
   text-align: left;
@@ -276,6 +277,8 @@ button.icon.pin[aria-pressed="true"] { color: var(--wax); background: #fff6f2; b
   border-radius: 8px;
   padding: 0.35rem 0.3rem;
 }
+.opp { grid-template-columns: 18px minmax(0, 1fr) auto auto; }
+.pin-row { grid-template-columns: minmax(0, 1fr) auto auto; }
 .opp[aria-pressed="true"] { background: var(--paper-2); }
 .opp:hover { background: var(--paper-2); }
 .muted { color: var(--muted); }

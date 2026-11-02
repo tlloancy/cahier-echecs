@@ -4,7 +4,8 @@ import { boardHtml } from './board.ts'
 import { icons } from './icons.ts'
 import { loadBook } from './book.ts'
 import { loadPlayer } from './api.ts'
-import { readUser, writePins, writeUser } from './db.ts'
+import { countryName, fetchCountry } from './countries.ts'
+import { onDatabaseBlocked, readCountries, readUser, writeCountry, writePins, writeUser } from './db.ts'
 import { Engine } from './engine.ts'
 import {
   buildTree,
@@ -35,6 +36,7 @@ const state: {
   user: string
   display: string
   games: LightGame[]
+  countries: Record<string, string>
   book: Book
   filters: Filters
   path: string[]
@@ -50,6 +52,7 @@ const state: {
   user: '',
   display: '',
   games: [],
+  countries: {},
   book: {},
   filters: { color: 'all', tc: 'all', opp: null },
   path: [],
@@ -64,6 +67,7 @@ const state: {
 
 let treeCache: { key: string; games: LightGame[]; root: TreeNode } | null = null
 let loadAbort: AbortController | null = null
+let countryAbort: AbortController | null = null
 let analysisJob = 0
 let engine: Engine | null = null
 const app = document.querySelector('#app') as HTMLElement
@@ -91,6 +95,12 @@ function num(value: number): string {
 
 function countLabel(value: number, singular: string, plural: string): string {
   return `${num(value)} ${value === 1 ? singular : plural}`
+}
+
+function flagHtml(code: string): string {
+  if (!/^[A-Z]{2}$/.test(code)) return ''
+  const name = countryName(code)
+  return `<img class="flag" src="https://flagcdn.com/24x18/${code.toLowerCase()}.png" width="18" height="14" alt="${esc(name)}" title="${esc(name)}">`
 }
 
 function pathKey(path: string[]): string {
@@ -268,7 +278,8 @@ function dashboard(): string {
             ${opponents
               .map((row) => {
                 const active = oppActive === row.name.toLowerCase()
-                return `<li><button type="button" class="opp" data-opp="${esc(row.name)}" aria-pressed="${active ? 'true' : 'false'}"><span>${esc(row.name)}</span><span class="muted">${num(row.games)}</span><span>${winPercent(row)} %</span></button></li>`
+                const code = state.countries[row.name.toLowerCase()] || ''
+                return `<li><button type="button" class="opp" data-opp="${esc(row.name)}" aria-pressed="${active ? 'true' : 'false'}"><span class="flag-slot" data-flag="${esc(row.name)}">${flagHtml(code)}</span><span>${esc(row.name)}</span><span class="muted">${num(row.games)}</span><span>${winPercent(row)} %</span></button></li>`
               })
               .join('') || '<li class="muted">Aucun adversaire dans cette sélection.</li>'}
           </ul>
@@ -341,6 +352,40 @@ function go(path: string[]): void {
   render()
 }
 
+function opponentNames(): string[] {
+  return [...new Set(state.games.map((game) => game.opp))]
+}
+
+async function rememberCountries(): Promise<void> {
+  if (!state.games.length) return
+  const known = await readCountries(opponentNames())
+  state.countries = { ...state.countries, ...known }
+}
+
+function showFlag(name: string, code: string): void {
+  const slot = document.querySelector(`[data-flag="${CSS.escape(name)}"]`)
+  if (slot && !slot.querySelector('img')) slot.innerHTML = flagHtml(code)
+}
+
+async function fillCountries(): Promise<void> {
+  countryAbort?.abort()
+  const controller = new AbortController()
+  countryAbort = controller
+  const missing = opponentNames().filter((name) => !state.countries[name.toLowerCase()])
+  for (const name of missing) {
+    if (controller.signal.aborted) return
+    try {
+      const code = await fetchCountry(name, controller.signal)
+      if (!code || controller.signal.aborted) continue
+      state.countries[name.toLowerCase()] = code
+      await writeCountry(name, code)
+      showFlag(name, code)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+    }
+  }
+}
+
 async function restore(user: string): Promise<void> {
   const saved = await readUser(user)
   if (!saved) return
@@ -359,6 +404,7 @@ async function load(username: string): Promise<void> {
   const trimmed = username.trim()
   if (!trimmed) return
   loadAbort?.abort()
+  countryAbort?.abort()
   const controller = new AbortController()
   loadAbort = controller
   analysisJob += 1
@@ -388,7 +434,9 @@ async function load(username: string): Promise<void> {
     treeCache = null
     state.phase = 'ready'
     state.message = `${num(games.length)} parties chargées.`
+    await rememberCountries()
     render()
+    void fillCountries()
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       state.phase = state.games.length ? 'ready' : 'idle'
@@ -515,6 +563,7 @@ function bind(): void {
 }
 
 async function boot(): Promise<void> {
+  onDatabaseBlocked(() => setMessage('Ferme l’autre onglet du cahier pour continuer.'))
   state.message = 'Chargement du livre d’ouvertures…'
   render()
   try {
@@ -528,8 +577,10 @@ async function boot(): Promise<void> {
   const last = localStorage.getItem(LAST_KEY)
   if (last) await restore(last)
   else state.message = ''
+  await rememberCountries()
   state.phase = state.games.length ? 'ready' : 'idle'
   render()
+  if (state.games.length) void fillCountries()
 }
 
 void boot()
