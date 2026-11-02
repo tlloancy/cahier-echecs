@@ -225,7 +225,7 @@ function dashboard(): string {
   const analysisHtml = analysis
     ? `<div id="analysis">
         <p id="analysis-status" class="status ${analysis.running ? 'running' : ''}">${esc(analysis.status)}</p>
-        ${findingList(icons.alert, 'Failles', 'Un coup moins bon, dans une des parties regardées.', analysis.failles, 'Aucune faille dans ces parties.', 'faille')}
+        ${findingList(icons.alert, 'Failles', 'Un coup moins bon dans les huit premiers. Pas celui qui perd la partie plus tard.', analysis.failles, 'Aucune faille dans ces parties.', 'faille')}
         ${findingList(icons.spark, 'Coups décisifs', 'Tu donnes du matériel, et c’est quand même le bon coup.', analysis.decisifs, 'Aucun dans ces parties.', 'decisif')}
       </div>`
     : ''
@@ -301,10 +301,10 @@ function dashboard(): string {
           <h2>${node.name ? esc(node.name) : 'Ouvertures'}</h2>
           <span class="toolbar-actions">
             ${state.path.length ? `<button type="button" class="icon pin" id="pin-here" aria-pressed="${pinnedHere ? 'true' : 'false'}" aria-label="${pinnedHere ? 'Retirer cette ligne' : 'Épingler cette ligne'}" title="${pinnedHere ? 'Retirer' : 'Épingler'}">${icons.pin}</button>` : ''}
-            ${state.path.length ? (state.analysis?.running ? `<button type="button" class="icon stop" id="stop-analysis" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : `<button type="button" class="icon primary" id="analyze" aria-label="Quelques parties, un mauvais coup" title="Quelques parties, un mauvais coup">${icons.search}</button>`) : ''}
+            ${state.path.length ? (state.analysis?.running ? `<button type="button" class="icon stop" id="stop-analysis" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : `<button type="button" class="icon primary" id="analyze" aria-label="Huit premiers coups de quelques parties" title="Huit premiers coups de quelques parties">${icons.search}</button>`) : ''}
           </span>
         </div>
-        <p class="note">Douze premiers coups seulement. La loupe regarde quelques parties et signale un mauvais coup.</p>
+        <p class="note">Douze premiers coups à l’écran. La loupe s’arrête au huitième : elle ne voit pas le coup qui fait basculer après.</p>
         ${state.path.length ? `<p class="position-name">${esc(state.path.join(' '))}</p>` : ''}
         <nav class="crumbs">${crumbs}</nav>
         <div class="opening-grid">
