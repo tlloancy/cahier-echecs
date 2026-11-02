@@ -54,7 +54,7 @@ const state: {
   games: [],
   countries: {},
   book: {},
-  filters: { color: 'all', tc: 'all', result: 'all', country: null, opp: null },
+  filters: { color: 'all', tc: 'all', result: 'all', ending: 'all', country: null, opp: null },
   path: [],
   pins: [],
   flip: false,
@@ -112,7 +112,7 @@ function engineUrl(): string {
 }
 
 function currentView(): { games: LightGame[]; root: TreeNode; node: TreeNode } {
-  const key = `${state.generation}|${state.filters.color}|${state.filters.tc}|${state.filters.result}|${state.filters.country || ''}|${state.filters.opp || ''}`
+  const key = `${state.generation}|${state.filters.color}|${state.filters.tc}|${state.filters.result}|${state.filters.ending}|${state.filters.country || ''}|${state.filters.opp || ''}`
   if (!treeCache || treeCache.key !== key) {
     const games = selectGames(state.games, state.filters, state.countries)
     treeCache = { key, games, root: buildTree(games, state.book) }
@@ -226,6 +226,10 @@ function dashboard(): string {
     : ''
   const oppActive = state.filters.opp
   const base = tallyOf(selectGames(state.games, { ...state.filters, result: 'all' }, state.countries))
+  const endings = { mate: 0, resign: 0, time: 0 }
+  for (const game of selectGames(state.games, { ...state.filters, ending: 'all' }, state.countries)) {
+    if (game.how === 'mate' || game.how === 'resign' || game.how === 'time') endings[game.how] += 1
+  }
   const resultCards: Array<[Filters['result'], number, string, string]> = [
     ['all', base.games, base.games === 1 ? 'partie' : 'parties', `${scorePercent(base)} % de score`],
     ['w', base.w, base.w === 1 ? 'victoire' : 'victoires', `${winPercent(base)} % de victoires`],
@@ -263,6 +267,18 @@ function dashboard(): string {
             ([value, mark, label]) =>
               `<button type="button" class="icon" data-tc="${value}" aria-pressed="${state.filters.tc === value ? 'true' : 'false'}" aria-label="${label}" title="${label}">${mark}</button>`,
           )
+          .join('')}
+      </div>
+      <div class="seg words" role="group" aria-label="Fin de partie">
+        ${([
+          ['mate', 'Mat', 'Échec et mat'],
+          ['resign', 'Abandon', 'Abandon'],
+          ['time', 'Temps', 'Temps'],
+        ] as const)
+          .map(([value, label, title]) => {
+            const pressed = state.filters.ending === value
+            return `<button type="button" data-ending="${value}" aria-pressed="${pressed ? 'true' : 'false'}" title="${title}">${label} <span>${num(endings[value])}</span></button>`
+          })
           .join('')}
       </div>
       <button type="button" class="icon" id="flip" aria-label="${state.flip ? 'Côté blancs' : 'Retourner l’échiquier'}" title="${state.flip ? 'Côté blancs' : 'Retourner'}">${icons.flip}</button>
@@ -497,7 +513,7 @@ async function load(username: string): Promise<void> {
     state.games = games
     state.pins = previousPins
     state.path = []
-    state.filters = { color: 'all', tc: 'all', result: 'all', country: null, opp: null }
+    state.filters = { color: 'all', tc: 'all', result: 'all', ending: 'all', country: null, opp: null }
     state.generation += 1
     treeCache = null
     state.phase = 'ready'
@@ -562,6 +578,13 @@ function bind(): void {
   document.getElementById('pseudo')?.addEventListener('input', (event) => {
     state.draft = (event.target as HTMLInputElement).value
   })
+  for (const button of app.querySelectorAll<HTMLButtonElement>('[data-ending]')) {
+    button.addEventListener('click', () => {
+      const value = button.dataset.ending as Filters['ending']
+      state.filters.ending = state.filters.ending === value ? 'all' : value
+      render()
+    })
+  }
   for (const button of app.querySelectorAll<HTMLButtonElement>('[data-result]')) {
     button.addEventListener('click', () => {
       const value = button.dataset.result as Filters['result']

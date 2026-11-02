@@ -231,6 +231,21 @@ button.icon[aria-pressed="true"] { background: var(--ink); color: #f6f0e6; borde
 button.icon.pin[aria-pressed="true"] { color: var(--wax); background: #fff6f2; border-color: var(--wax); }
 .ico { width: 1.15rem; height: 1.15rem; display: block; }
 .toolbar-actions, .seg { display: flex; gap: 0.35rem; align-items: center; }
+.seg.words button {
+  width: auto;
+  height: 2.45rem;
+  min-height: 2.45rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fffdf9;
+}
+.seg.words button span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.seg.words button[aria-pressed="true"] { background: var(--ink); color: #f6f0e6; border-color: var(--ink); }
+.seg.words button[aria-pressed="true"] span { color: inherit; }
 .mini-piece {
   width: 0.85rem;
   height: 0.85rem;

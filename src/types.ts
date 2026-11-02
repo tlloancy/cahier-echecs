@@ -1,5 +1,6 @@
 export type TimeClass = 'bullet' | 'blitz' | 'rapid' | 'daily' | 'other'
 export type GameResult = 'w' | 'd' | 'l'
+export type Ending = 'mate' | 'resign' | 'time' | 'other'
 export type Side = 'w' | 'b'
 
 export interface LightGame {
@@ -8,6 +9,7 @@ export interface LightGame {
   display: string
   color: Side
   result: GameResult
+  how: Ending
   tc: TimeClass
   opp: string
   end: number
@@ -27,6 +29,7 @@ export interface Filters {
   color: 'all' | Side
   tc: 'all' | TimeClass
   result: 'all' | GameResult
+  ending: 'all' | 'mate' | 'resign' | 'time'
   country: string | null
   opp: string | null
 }

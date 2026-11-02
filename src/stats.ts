@@ -33,6 +33,7 @@ export function selectGames(games: LightGame[], filters: Filters, countries: Rec
     if (filters.color !== 'all' && game.color !== filters.color) return false
     if (filters.tc !== 'all' && game.tc !== filters.tc) return false
     if (filters.result !== 'all' && game.result !== filters.result) return false
+    if (filters.ending !== 'all' && game.how !== filters.ending) return false
     if (filters.country && countries[game.opp.toLowerCase()] !== filters.country) return false
     if (filters.opp && game.opp.toLowerCase() !== filters.opp) return false
     return true

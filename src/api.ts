@@ -1,7 +1,7 @@
 import { parsePgn, startingPosition } from 'chessops/pgn'
 import { makeSanAndPlay, parseSan } from 'chessops/san'
 import { epd, MAX_PLIES } from './book.ts'
-import type { Book, GameResult, LightGame, Side, TimeClass } from './types.ts'
+import type { Book, Ending, GameResult, LightGame, Side, TimeClass } from './types.ts'
 
 interface ApiPlayer {
   username?: string
@@ -26,6 +26,14 @@ function resultOf(code: string | undefined): GameResult | null {
   if (code === 'win') return 'w'
   if (DRAWS.has(code)) return 'd'
   return 'l'
+}
+
+function endingOf(mine: string | undefined, theirs: string | undefined): Ending {
+  const code = mine === 'win' ? theirs : mine
+  if (code === 'checkmated') return 'mate'
+  if (code === 'resigned' || code === 'abandoned') return 'resign'
+  if (code === 'timeout') return 'time'
+  return 'other'
 }
 
 function timeClassOf(value: string | undefined): TimeClass {
@@ -80,14 +88,17 @@ function toLight(raw: ApiGame, user: string, book: Book, index: number): LightGa
   const blackKey = black.toLowerCase()
   let color: Side
   let result: GameResult | null
+  let how: Ending
   let opp: string
   if (whiteKey === user) {
     color = 'w'
     result = resultOf(raw.white?.result)
+    how = endingOf(raw.white?.result, raw.black?.result)
     opp = black
   } else if (blackKey === user) {
     color = 'b'
     result = resultOf(raw.black?.result)
+    how = endingOf(raw.black?.result, raw.white?.result)
     opp = white
   } else {
     return null
@@ -102,6 +113,7 @@ function toLight(raw: ApiGame, user: string, book: Book, index: number): LightGa
     display: color === 'w' ? white : black,
     color,
     result,
+    how,
     tc: timeClassOf(raw.time_class),
     opp: opp || 'inconnu',
     end: raw.end_time || 0,
