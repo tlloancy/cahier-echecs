@@ -61,4 +61,5 @@ export interface Finding {
   san: string
   best: string
   cpl: number
+  line: string
 }

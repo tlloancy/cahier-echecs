@@ -63,7 +63,7 @@ export async function analyzeLine(
               material(after, side) -
               (material(before, other) - material(after, other))
             if (net >= SACRIFICE) {
-              decisifs.push({ url: game.url, opp: game.opp, ply, san, best: bestSan, cpl: 0 })
+              decisifs.push({ url: game.url, opp: game.opp, ply, san, best: bestSan, cpl: 0, line: game.line })
             }
           } else {
             const follow = await engine.best(makeFen(after.toSetup()), DEPTH)
@@ -73,7 +73,7 @@ export async function analyzeLine(
                 ? whiteCentipawns(answer) - whiteCentipawns(follow)
                 : whiteCentipawns(follow) - whiteCentipawns(answer)
             if (loss >= FAILLE_CP) {
-              failles.push({ url: game.url, opp: game.opp, ply, san, best: bestSan, cpl: Math.round(loss) })
+              failles.push({ url: game.url, opp: game.opp, ply, san, best: bestSan, cpl: Math.round(loss), line: game.line })
             }
           }
         }

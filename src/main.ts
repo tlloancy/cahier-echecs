@@ -1,6 +1,7 @@
 import './style.css'
 import { analyzeLine } from './analyze.ts'
 import { boardHtml } from './board.ts'
+import { icons } from './icons.ts'
 import { loadBook } from './book.ts'
 import { loadPlayer } from './api.ts'
 import { readUser, writePins, writeUser } from './db.ts'
@@ -15,10 +16,9 @@ import {
   selectGames,
   sortedChildren,
   tallyOf,
-  timeLabel,
   winPercent,
 } from './stats.ts'
-import type { Book, Filters, Finding, LightGame, TimeClass, TreeNode } from './types.ts'
+import type { Book, Filters, Finding, LightGame, TreeNode } from './types.ts'
 
 const LAST_KEY = 'cahier-echecs-user'
 
@@ -128,20 +128,20 @@ function moveLabel(ply: number, san: string): string {
   return ply % 2 === 1 ? `${move}. ${san}` : `${move}… ${san}`
 }
 
-function findingList(title: string, rows: Finding[], empty: string, kind: 'faille' | 'decisif'): string {
+function findingList(mark: string, label: string, rows: Finding[], empty: string, kind: 'faille' | 'decisif'): string {
   const items = rows.length
     ? rows
         .map((row) => {
-          const link = row.url ? `<a href="${esc(row.url)}" target="_blank" rel="noreferrer">partie contre ${esc(row.opp)}</a>` : esc(row.opp)
-          const detail =
-            kind === 'faille'
-              ? `${moveLabel(row.ply, row.san)} au lieu de ${row.best} · −${num(row.cpl)} cp`
-              : moveLabel(row.ply, row.san)
-          return `<li><span>${esc(detail)}</span><span class="muted">${link}</span></li>`
+          const link = row.url
+            ? `<a class="icon-link" href="${esc(row.url)}" target="_blank" rel="noreferrer" aria-label="Partie contre ${esc(row.opp)}" title="Partie contre ${esc(row.opp)}">${icons.link}</a>`
+            : ''
+          const detail = kind === 'faille' ? `${moveLabel(row.ply, row.san)} → ${row.best}` : moveLabel(row.ply, row.san)
+          const loss = kind === 'faille' ? `<span class="loss">−${num(row.cpl)}</span>` : ''
+          return `<li><button type="button" class="finding" data-line="${esc(row.line)}" data-ply="${row.ply}"><span>${esc(detail)}</span>${loss}<span class="muted">${esc(row.opp)}</span></button>${link}</li>`
         })
         .join('')
     : `<li class="muted">${esc(empty)}</li>`
-  return `<section><h2>${esc(title)}</h2><ul class="finding-list">${items}</ul></section>`
+  return `<section class="findings"><h2 class="icon-title" title="${esc(label)}">${mark}<span class="sr">${esc(label)}</span></h2><ul class="finding-list">${items}</ul></section>`
 }
 
 function dashboard(): string {
@@ -155,7 +155,7 @@ function dashboard(): string {
     .filter((row) => !query || row.name.toLowerCase().includes(query))
     .slice(0, 80)
   const crumbs = [
-    `<button type="button" data-path="" ${state.path.length === 0 ? 'aria-current="true"' : ''}>Départ</button>`,
+    `<button type="button" class="icon" data-path="" aria-label="Départ" title="Départ" ${state.path.length === 0 ? 'aria-current="true"' : ''}>${icons.home}</button>`,
     ...state.path.map((san, index) => {
       const key = state.path.slice(0, index + 1).join('|')
       const current = index === state.path.length - 1 ? 'aria-current="true"' : ''
@@ -177,7 +177,7 @@ function dashboard(): string {
               <span class="pct">${winPercent(child)} %</span>
               ${bar(child)}
             </button>
-            <button type="button" class="pin" data-line="${esc(line)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${on ? 'Retirer' : 'Épingler'} ${esc(child.move)}">${on ? '★' : '☆'}</button>
+            <button type="button" class="icon pin" data-line="${esc(line)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${on ? 'Retirer' : 'Épingler'} ${esc(child.move)}" title="${on ? 'Retirer' : 'Épingler'}">${icons.pin}</button>
           </div>`
         })
         .join('')
@@ -190,20 +190,18 @@ function dashboard(): string {
           return `<li class="pin-row">
             <button type="button" class="text-btn" data-path="${esc(path.join('|'))}">${esc(line)}</button>
             <span class="muted">${num(row.games)} · ${winPercent(row)} %</span>
-            <button type="button" class="text-btn" data-drop="${esc(line)}">Retirer</button>
+            <button type="button" class="icon" data-drop="${esc(line)}" aria-label="Retirer" title="Retirer">${icons.close}</button>
           </li>`
         })
         .join('')}</ul>`
-    : '<p class="muted">Épingle une ligne dans l’arbre pour la retrouver ici.</p>'
+    : '<p class="muted">Aucune ligne épinglée.</p>'
   const analysis = state.analysis
   const analysisHtml = analysis
-    ? `<section class="panel">
-        <h2>Ligne ${esc(analysis.line)}</h2>
-        <p id="analysis-status" class="status">${esc(analysis.status)}</p>
-        ${analysis.running ? '<button type="button" class="stop" id="stop-analysis">Arrêter</button>' : ''}
-        ${findingList('Failles', analysis.failles, 'Aucune faille dans cet échantillon.', 'faille')}
-        ${findingList('Coups décisifs', analysis.decisifs, 'Aucun coup décisif dans cet échantillon.', 'decisif')}
-      </section>`
+    ? `<div id="analysis">
+        <p id="analysis-status" class="status ${analysis.running ? 'running' : ''}">${esc(analysis.status)}</p>
+        ${findingList(icons.alert, 'Failles', analysis.failles, 'Aucune faille dans cet échantillon.', 'faille')}
+        ${findingList(icons.spark, 'Coups décisifs', analysis.decisifs, 'Aucun coup décisif dans cet échantillon.', 'decisif')}
+      </div>`
     : ''
   const oppActive = state.filters.opp
   return `<section class="summary">
@@ -213,24 +211,39 @@ function dashboard(): string {
       <div><span>${countLabel(tally.w, 'victoire', 'victoires')} · ${countLabel(tally.d, 'nulle', 'nulles')} · ${countLabel(tally.l, 'défaite', 'défaites')}</span></div>
     </section>
     <div class="filters">
-      <label>Couleur
-        <select id="color">
-          ${['all', 'w', 'b'].map((value) => `<option value="${value}" ${state.filters.color === value ? 'selected' : ''}>${value === 'all' ? 'Les deux' : value === 'w' ? 'Blancs' : 'Noirs'}</option>`).join('')}
-        </select>
-      </label>
-      <label>Cadence
-        <select id="tc">
-          ${(['all', 'bullet', 'blitz', 'rapid', 'daily'] as const).map((value) => `<option value="${value}" ${state.filters.tc === value ? 'selected' : ''}>${timeLabel(value)}</option>`).join('')}
-        </select>
-      </label>
-      <button type="button" class="ghost" id="flip">${state.flip ? 'Côté blancs' : 'Retourner'}</button>
+      <div class="seg" role="group" aria-label="Couleur">
+        ${(['all', 'w', 'b'] as const)
+          .map((value) => {
+            const label = value === 'all' ? 'Les deux couleurs' : value === 'w' ? 'Blancs' : 'Noirs'
+            const mark = value === 'all' ? icons.both : value === 'w' ? '<span class="mini-piece w"></span>' : '<span class="mini-piece b"></span>'
+            return `<button type="button" class="icon" data-color="${value}" aria-pressed="${state.filters.color === value ? 'true' : 'false'}" aria-label="${label}" title="${label}">${mark}</button>`
+          })
+          .join('')}
+      </div>
+      <div class="seg" role="group" aria-label="Cadence">
+        ${([
+          ['all', icons.rows, 'Toutes les cadences'],
+          ['bullet', icons.bolt, 'Bullet'],
+          ['blitz', icons.flame, 'Blitz'],
+          ['rapid', icons.clock, 'Rapide'],
+          ['daily', icons.calendar, 'Correspondance'],
+        ] as const)
+          .map(
+            ([value, mark, label]) =>
+              `<button type="button" class="icon" data-tc="${value}" aria-pressed="${state.filters.tc === value ? 'true' : 'false'}" aria-label="${label}" title="${label}">${mark}</button>`,
+          )
+          .join('')}
+      </div>
+      <button type="button" class="icon" id="flip" aria-label="${state.flip ? 'Côté blancs' : 'Retourner l’échiquier'}" title="${state.flip ? 'Côté blancs' : 'Retourner'}">${icons.flip}</button>
     </div>
     <div class="layout">
       <section class="panel">
         <div class="toolbar">
           <h2>${node.name ? esc(node.name) : 'Ouvertures'}</h2>
-          ${state.path.length ? `<button type="button" class="ghost" id="pin-here" aria-pressed="${pinnedHere ? 'true' : 'false'}">${pinnedHere ? 'Épinglée' : 'Épingler cette ligne'}</button>` : ''}
-          ${state.path.length ? `<button type="button" class="primary" id="analyze">Analyser</button>` : ''}
+          <span class="toolbar-actions">
+            ${state.path.length ? `<button type="button" class="icon pin" id="pin-here" aria-pressed="${pinnedHere ? 'true' : 'false'}" aria-label="${pinnedHere ? 'Retirer cette ligne' : 'Épingler cette ligne'}" title="${pinnedHere ? 'Retirer' : 'Épingler'}">${icons.pin}</button>` : ''}
+            ${state.path.length ? (state.analysis?.running ? `<button type="button" class="icon stop" id="stop-analysis" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : `<button type="button" class="icon primary" id="analyze" aria-label="Analyser" title="Analyser">${icons.search}</button>`) : ''}
+          </span>
         </div>
         <p class="position-name">${state.path.length ? esc(state.path.join(' ')) : 'Les douze premiers coups. Le nom vient du livre d’ouvertures.'}</p>
         <nav class="crumbs">${crumbs}</nav>
@@ -238,13 +251,18 @@ function dashboard(): string {
           <div class="tree">${tree}</div>
           ${boardHtml(state.path, state.flip)}
         </div>
+        ${analysisHtml}
       </section>
       <div class="side">
         <section class="panel">
-          <h2>Adversaires</h2>
-          ${oppActive ? `<button type="button" class="ghost" id="clear-opp">Tous les adversaires</button>` : ''}
-          <label>Recherche
-            <input id="opp-search" value="${esc(state.oppQuery)}" placeholder="Pseudo" />
+          <div class="toolbar">
+            <h2 class="icon-title" title="Adversaires">${icons.users}<span class="sr">Adversaires</span></h2>
+            ${oppActive ? `<button type="button" class="icon" id="clear-opp" aria-label="Tous les adversaires" title="Tous les adversaires">${icons.close}</button>` : ''}
+          </div>
+          <label class="search">
+            <span class="sr">Recherche</span>
+            ${icons.search}
+            <input id="opp-search" value="${esc(state.oppQuery)}" placeholder="Adversaire" />
           </label>
           <ul class="opp-list">
             ${opponents
@@ -256,10 +274,9 @@ function dashboard(): string {
           </ul>
         </section>
         <section class="panel">
-          <h2>Lignes épinglées</h2>
+          <h2 class="icon-title" title="Lignes épinglées">${icons.pin}<span class="sr">Lignes épinglées</span></h2>
           ${pins}
         </section>
-        ${analysisHtml}
       </div>
     </div>`
 }
@@ -278,8 +295,8 @@ function render(): void {
         <label>Pseudo Chess.com
           <input id="pseudo" name="pseudo" autocomplete="username" required value="${esc(state.draft)}" />
         </label>
-        <button class="primary" type="submit" ${state.phase === 'loading' ? 'disabled' : ''}>${loaded ? 'Mettre à jour' : 'Charger'}</button>
-        ${state.phase === 'loading' ? '<button class="stop" type="button" id="cancel">Arrêter</button>' : ''}
+        <button class="icon primary" type="submit" aria-label="${loaded ? 'Mettre à jour' : 'Charger'}" title="${loaded ? 'Mettre à jour' : 'Charger'}" ${state.phase === 'loading' ? 'disabled' : ''}>${loaded ? icons.refresh : icons.download}</button>
+        ${state.phase === 'loading' ? `<button class="icon stop" type="button" id="cancel" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : ''}
       </form>
       <p id="status" class="status ${state.phase === 'error' ? 'error' : ''}" role="status">${esc(state.message)}</p>
     </section>
@@ -407,8 +424,9 @@ async function startAnalysis(): Promise<void> {
     state.analysis.running = false
     state.analysis.failles = result.failles
     state.analysis.decisifs = result.decisifs
-    state.analysis.status = 'Huit parties récentes au plus, profondeur 6, sur les huit premiers coups.'
+    state.analysis.status = 'Huit parties récentes, profondeur 6.'
     render()
+    document.getElementById('analysis')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   } catch (error) {
     if (job !== analysisJob || !state.analysis) return
     state.analysis.running = false
@@ -428,20 +446,27 @@ function bind(): void {
   document.getElementById('pseudo')?.addEventListener('input', (event) => {
     state.draft = (event.target as HTMLInputElement).value
   })
-  document.getElementById('color')?.addEventListener('change', (event) => {
-    state.filters.color = (event.target as HTMLSelectElement).value as Filters['color']
-    render()
-  })
-  document.getElementById('tc')?.addEventListener('change', (event) => {
-    state.filters.tc = (event.target as HTMLSelectElement).value as Filters['tc'] | TimeClass
-    render()
-  })
+  for (const button of app.querySelectorAll<HTMLButtonElement>('[data-color]')) {
+    button.addEventListener('click', () => {
+      state.filters.color = button.dataset.color as Filters['color']
+      render()
+    })
+  }
+  for (const button of app.querySelectorAll<HTMLButtonElement>('[data-tc]')) {
+    button.addEventListener('click', () => {
+      state.filters.tc = button.dataset.tc as Filters['tc']
+      render()
+    })
+  }
   document.getElementById('flip')?.addEventListener('click', () => {
     state.flip = !state.flip
     render()
   })
   document.getElementById('pin-here')?.addEventListener('click', () => togglePin(pathKey(state.path)))
-  document.getElementById('analyze')?.addEventListener('click', () => void startAnalysis())
+  document.getElementById('analyze')?.addEventListener('click', () => {
+    document.getElementById('analysis-status')?.replaceChildren()
+    void startAnalysis()
+  })
   document.getElementById('stop-analysis')?.addEventListener('click', () => {
     analysisJob += 1
     engine?.stop()
@@ -470,6 +495,14 @@ function bind(): void {
   }
   for (const button of app.querySelectorAll<HTMLButtonElement>('[data-drop]')) {
     button.addEventListener('click', () => togglePin(button.dataset.drop || ''))
+  }
+  for (const button of app.querySelectorAll<HTMLButtonElement>('.finding')) {
+    button.addEventListener('click', () => {
+      const line = button.dataset.line || ''
+      const ply = Number(button.dataset.ply || 0)
+      state.path = line.split(' ').slice(0, ply)
+      render()
+    })
   }
   for (const button of app.querySelectorAll<HTMLButtonElement>('[data-opp]')) {
     button.addEventListener('click', () => {
