@@ -4,7 +4,7 @@ import { boardHtml } from './board.ts'
 import { icons } from './icons.ts'
 import { loadBook } from './book.ts'
 import { loadPlayer } from './api.ts'
-import { countryName, fetchCountry } from './countries.ts'
+import { countryName, fetchCountry, flagSrc } from './countries.ts'
 import { onDatabaseBlocked, readCountries, readUser, writeCountry, writePins, writeUser } from './db.ts'
 import { Engine } from './engine.ts'
 import {
@@ -96,7 +96,7 @@ function num(value: number): string {
 function flagHtml(code: string): string {
   if (!/^[A-Z]{2}$/.test(code)) return ''
   const name = countryName(code)
-  return `<img class="flag" src="https://flagcdn.com/24x18/${code.toLowerCase()}.png" width="18" height="14" alt="${esc(name)}" title="${esc(name)}">`
+  return `<img class="flag" src="${esc(flagSrc(code, import.meta.env.BASE_URL))}" width="18" height="14" alt="${esc(name)}" title="${esc(name)}">`
 }
 
 function pathKey(path: string[]): string {

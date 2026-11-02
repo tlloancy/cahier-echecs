@@ -1,11 +1,33 @@
 const regions = new Intl.DisplayNames(['fr'], { type: 'region' })
 
+const extra: Record<string, string> = {
+  XA: 'Îles Canaries',
+  XB: 'Pays basque',
+  XC: 'Catalogne',
+  XE: 'Angleterre',
+  XG: 'Galice',
+  XO: 'Olympique',
+  XP: 'Paralympique',
+  XS: 'Écosse',
+  XT: 'Taipei chinois',
+  XW: 'Pays de Galles',
+  XX: 'International',
+}
+
 export function countryName(code: string): string {
+  const known = extra[code.toUpperCase()]
+  if (known) return known
   try {
     return regions.of(code) || code
   } catch {
     return code
   }
+}
+
+export function flagSrc(code: string, base: string): string {
+  const key = code.toLowerCase()
+  if (extra[code.toUpperCase()]) return `${base}flags/${key}.png`
+  return `https://flagcdn.com/24x18/${key}.png`
 }
 
 export async function fetchCountry(username: string, signal: AbortSignal): Promise<string | null> {
