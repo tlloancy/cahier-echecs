@@ -117,8 +117,65 @@ export function opponentRows(games: LightGame[]): OppRow[] {
   return [...rows.values()].sort((a, b) => b.games - a.games || a.name.localeCompare(b.name, 'fr'))
 }
 
+export function playedLine(game: LightGame): string {
+  return game.moves || game.line
+}
+
+export interface ContRow extends Tally {
+  move: string
+  name: string
+}
+
+export function nextRows(games: LightGame[], path: string[], book: Book): { here: Tally; name: string; rows: ContRow[] } {
+  const here = emptyTally()
+  const map = new Map<string, ContRow>()
+  const prefix = path.join(' ')
+  const mark = prefix ? `${prefix} ` : ''
+  for (const game of games) {
+    const line = playedLine(game)
+    if (prefix && line !== prefix && !line.startsWith(mark)) continue
+    addResult(here, game.result)
+    let next = ''
+    if (!prefix) {
+      if (!line) continue
+      const cut = line.indexOf(' ')
+      next = cut === -1 ? line : line.slice(0, cut)
+    } else if (line.startsWith(mark)) {
+      const rest = line.slice(mark.length)
+      const cut = rest.indexOf(' ')
+      next = cut === -1 ? rest : rest.slice(0, cut)
+    }
+    if (!next) continue
+    let row = map.get(next)
+    if (!row) {
+      row = { move: next, name: '', games: 0, w: 0, d: 0, l: 0 }
+      map.set(next, row)
+    }
+    addResult(row, game.result)
+  }
+  const rows = [...map.values()].sort((a, b) => b.games - a.games || a.move.localeCompare(b.move, 'fr'))
+  const pos = Chess.default()
+  let name = ''
+  for (const san of path) {
+    const move = parseSan(pos, san)
+    if (!move) break
+    pos.play(move)
+    const hit = book[epd(pos)]
+    if (hit) name = hit.name
+  }
+  for (const row of rows) {
+    const branch = pos.clone()
+    const move = parseSan(branch, row.move)
+    if (!move) continue
+    branch.play(move)
+    const hit = book[epd(branch)]
+    row.name = hit?.name || name
+  }
+  return { here, name, rows }
+}
+
 export function gamesOnLine(games: LightGame[], path: string[]): LightGame[] {
-  return games.filter((game) => onLine(game.line, path)).sort((a, b) => b.end - a.end)
+  return games.filter((game) => onLine(playedLine(game), path)).sort((a, b) => b.end - a.end)
 }
 
 export function timeLabel(tc: TimeClass | 'all'): string {

@@ -2,24 +2,22 @@ import './style.css'
 import { analyzeLine } from './analyze.ts'
 import { boardHtml } from './board.ts'
 import { icons } from './icons.ts'
-import { loadBook, MAX_PLIES, nameAlong } from './book.ts'
-import { loadPlayer } from './api.ts'
+import { loadBook, nameAlong } from './book.ts'
+import { completeMonth, loadPlayer } from './api.ts'
 import { countryName, fetchCountry, flagSrc } from './countries.ts'
-import { onDatabaseBlocked, readCountries, readUser, writeCountry, writePins, writeUser } from './db.ts'
+import { onDatabaseBlocked, readCountries, readUser, writeCountry, writeGames, writePins, writeUser } from './db.ts'
 import { Engine } from './engine.ts'
 import {
-  buildTree,
-  clampPath,
   gamesOnLine,
-  nodeAt,
+  nextRows,
   opponentRows,
   scorePercent,
   selectGames,
-  sortedChildren,
   tallyOf,
   winPercent,
+  type ContRow,
 } from './stats.ts'
-import type { Book, Filters, Finding, LightGame, Tally, TreeNode } from './types.ts'
+import type { Book, Filters, Finding, LightGame, Tally } from './types.ts'
 
 const LAST_KEY = 'cahier-echecs-user'
 
@@ -65,7 +63,8 @@ const state: {
   generation: 0,
 }
 
-let treeCache: { key: string; games: LightGame[]; root: TreeNode } | null = null
+let filterCache: { key: string; games: LightGame[] } | null = null
+let stepCache: { key: string; here: Tally; name: string; rows: ContRow[] } | null = null
 let loadAbort: AbortController | null = null
 let countryAbort: AbortController | null = null
 let analysisJob = 0
@@ -112,19 +111,21 @@ function engineUrl(): string {
   return new URL(`${import.meta.env.BASE_URL}engine/stockfish-19-lite-single.js`, window.location.origin).href
 }
 
-function currentView(): { games: LightGame[]; root: TreeNode; node: TreeNode } {
-  const key = `${state.generation}|${state.filters.color}|${state.filters.tc}|${state.filters.result}|${state.filters.ending}|${state.filters.country || ''}|${state.filters.opp || ''}`
-  if (!treeCache || treeCache.key !== key) {
-    const games = selectGames(state.games, state.filters, state.countries)
-    treeCache = { key, games, root: buildTree(games, state.book) }
+function filterKey(): string {
+  return `${state.generation}|${state.filters.color}|${state.filters.tc}|${state.filters.result}|${state.filters.ending}|${state.filters.country || ''}|${state.filters.opp || ''}`
+}
+
+function currentView(): { games: LightGame[]; here: Tally; name: string; rows: ContRow[] } {
+  const key = filterKey()
+  if (!filterCache || filterCache.key !== key) {
+    filterCache = { key, games: selectGames(state.games, state.filters, state.countries) }
   }
-  const clamped = clampPath(treeCache.root, state.path)
-  const extendsTree =
-    clamped.length > 0 &&
-    clamped.length < state.path.length &&
-    state.path.slice(0, clamped.length).every((san, index) => san === clamped[index])
-  if (!extendsTree) state.path = clamped
-  return { games: treeCache.games, root: treeCache.root, node: nodeAt(treeCache.root, state.path) }
+  const stepKey = `${key}|${state.path.join('|')}`
+  if (!stepCache || stepCache.key !== stepKey) {
+    const step = nextRows(filterCache.games, state.path, state.book)
+    stepCache = { key: stepKey, here: step.here, name: step.name, rows: step.rows }
+  }
+  return { games: filterCache.games, here: stepCache.here, name: stepCache.name, rows: stepCache.rows }
 }
 
 function share(part: number, whole: number): number {
@@ -205,9 +206,9 @@ function loupeSection(): string {
 }
 
 function dashboard(): string {
-  const { games, node } = currentView()
+  const { games, here: spot, name, rows } = currentView()
   const tally = tallyOf(games)
-  const children = sortedChildren(node)
+  const children = rows
   const here = pathKey(state.path)
   const pinnedHere = state.pins.includes(here)
   const query = state.oppQuery.trim().toLowerCase()
@@ -234,14 +235,14 @@ function dashboard(): string {
               <span class="san">${esc(child.move)}</span>
               <span class="name">${esc(child.name)}</span>
               <span class="n">${num(child.games)}</span>
-              <span class="pct">${rate(child, node.games)}</span>
-              ${bar(child, node.games)}
+              <span class="pct">${rate(child, spot.games)}</span>
+              ${bar(child, spot.games)}
             </button>
             <button type="button" class="icon pin" data-line="${esc(line)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${on ? 'Retirer' : 'Épingler'} ${esc(child.move)}" title="${on ? 'Retirer' : 'Épingler'}">${icons.pin}</button>
           </div>`
         })
         .join('')
-    : `<p class="muted">${state.path.length >= MAX_PLIES ? 'Fin des douze premiers coups.' : 'Pas de coup suivant dans cette sélection.'}</p>`
+    : '<p class="muted">Pas de coup suivant dans cette sélection.</p>'
   const pins = state.pins.length
     ? `<ul class="pin-list">${state.pins
         .map((line) => {
@@ -330,13 +331,13 @@ function dashboard(): string {
     <div class="layout">
       <section class="panel">
         <div class="toolbar">
-          <h2>${node.name ? esc(node.name) : 'Ouvertures'}</h2>
+          <h2>${name ? esc(name) : 'Ouvertures'}</h2>
           <span class="toolbar-actions">
             ${state.path.length ? `<button type="button" class="icon pin" id="pin-here" aria-pressed="${pinnedHere ? 'true' : 'false'}" aria-label="${pinnedHere ? 'Retirer cette ligne' : 'Épingler cette ligne'}" title="${pinnedHere ? 'Retirer' : 'Épingler'}">${icons.pin}</button>` : ''}
             ${state.path.length && !state.analysis?.running ? `<button type="button" class="icon primary" id="analyze" aria-label="Parcourir toute la partie" title="Parcourir toute la partie">${icons.search}</button>` : ''}
           </span>
         </div>
-        <p class="note">Douze premiers coups à l’écran. La loupe parcourt toute la partie, pendant que tu continues.</p>
+        <p class="note">Le coup suivant dans tes parties. La loupe parcourt toute la partie, pendant que tu continues.</p>
         ${state.path.length ? `<p class="position-name">${esc(state.path.join(' '))}</p>` : ''}
         <nav class="crumbs">${crumbs}</nav>
         <div class="opening-grid">
@@ -489,16 +490,13 @@ function showFlag(name: string, code: string): void {
   paintCountryStrip()
 }
 
-async function fillCountries(): Promise<void> {
-  countryAbort?.abort()
-  const controller = new AbortController()
-  countryAbort = controller
+async function fillCountries(signal: AbortSignal): Promise<void> {
   const missing = opponentNames().filter((name) => !state.countries[name.toLowerCase()])
   for (const name of missing) {
-    if (controller.signal.aborted) return
+    if (signal.aborted) return
     try {
-      const code = await fetchCountry(name, controller.signal)
-      if (controller.signal.aborted) return
+      const code = await fetchCountry(name, signal)
+      if (signal.aborted) return
       const saved = code || '-'
       state.countries[name.toLowerCase()] = saved
       await writeCountry(name, saved)
@@ -507,6 +505,53 @@ async function fillCountries(): Promise<void> {
       if (error instanceof DOMException && error.name === 'AbortError') return
     }
   }
+}
+
+async function fillMoves(signal: AbortSignal): Promise<void> {
+  const pending = state.games.filter((game) => !game.moves && game.end && game.url)
+  if (!pending.length || !state.user) return
+  const groups = new Map<string, { year: number; month: number; games: LightGame[] }>()
+  for (const game of pending) {
+    const date = new Date(game.end * 1000)
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth() + 1
+    const key = `${year}-${month}`
+    let group = groups.get(key)
+    if (!group) {
+      group = { year, month, games: [] }
+      groups.set(key, group)
+    }
+    group.games.push(game)
+  }
+  const batches = [...groups.values()]
+  let done = 0
+  for (const batch of batches) {
+    if (signal.aborted) return
+    done += 1
+    const before = currentView().rows.length
+    setMessage(`Coups complets · ${done} / ${batches.length}`)
+    try {
+      const updated = await completeMonth(state.user, batch.year, batch.month, batch.games, state.book, signal)
+      await writeGames(updated)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') return
+      continue
+    }
+    state.generation += 1
+    filterCache = null
+    stepCache = null
+    if (currentView().rows.length > before) render()
+  }
+  setMessage(`${num(state.games.length)} parties en mémoire.`)
+}
+
+async function fillBackground(): Promise<void> {
+  countryAbort?.abort()
+  const controller = new AbortController()
+  countryAbort = controller
+  await fillMoves(controller.signal)
+  if (controller.signal.aborted) return
+  await fillCountries(controller.signal)
 }
 
 async function restore(user: string): Promise<void> {
@@ -519,7 +564,8 @@ async function restore(user: string): Promise<void> {
   state.pins = saved.pins
   state.phase = 'ready'
   state.generation += 1
-  treeCache = null
+  filterCache = null
+  stepCache = null
   state.message = `${num(saved.games.length)} parties en mémoire.`
 }
 
@@ -554,12 +600,13 @@ async function load(username: string): Promise<void> {
     state.path = []
     state.filters = { color: 'all', tc: 'all', result: 'all', ending: 'all', country: null, opp: null }
     state.generation += 1
-    treeCache = null
+    filterCache = null
+    stepCache = null
     state.phase = 'ready'
     state.message = `${num(games.length)} parties chargées.`
     await rememberCountries()
     render()
-    void fillCountries()
+    void fillBackground()
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       state.phase = state.games.length ? 'ready' : 'idle'
@@ -760,7 +807,7 @@ async function boot(): Promise<void> {
   await rememberCountries()
   state.phase = state.games.length ? 'ready' : 'idle'
   render()
-  if (state.games.length) void fillCountries()
+  if (state.games.length) void fillBackground()
 }
 
 void boot()

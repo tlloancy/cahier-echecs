@@ -81,6 +81,14 @@ export async function writeGame(game: LightGame): Promise<void> {
   await database.put('games', game)
 }
 
+export async function writeGames(games: LightGame[]): Promise<void> {
+  if (!games.length) return
+  const database = await db()
+  const tx = database.transaction('games', 'readwrite')
+  for (const game of games) tx.store.put(game)
+  await tx.done
+}
+
 export async function writePins(user: string, pins: string[]): Promise<void> {
   const database = await db()
   await database.put('pins', pins, user)

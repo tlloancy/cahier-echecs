@@ -41,7 +41,22 @@ function timeClassOf(value: string | undefined): TimeClass {
   return 'other'
 }
 
+let tail: Promise<unknown> = Promise.resolve()
+
+export function serial<T>(job: () => Promise<T>): Promise<T> {
+  const run = tail.then(job, job)
+  tail = run.then(
+    () => undefined,
+    () => undefined,
+  )
+  return run
+}
+
 async function getJson<T>(url: string, signal: AbortSignal): Promise<T> {
+  return serial(() => readJson<T>(url, signal))
+}
+
+async function readJson<T>(url: string, signal: AbortSignal): Promise<T> {
   let last = ''
   for (let attempt = 0; attempt < 4; attempt += 1) {
     const response = await fetch(url, { signal })
@@ -82,6 +97,38 @@ function readLine(pgn: string, book: Book): { line: string; moves: string; openi
 }
 
 const monthGames = new Map<string, ApiGame[]>()
+
+export async function completeMonth(
+  user: string,
+  year: number,
+  month: number,
+  games: LightGame[],
+  book: Book,
+  signal: AbortSignal,
+): Promise<LightGame[]> {
+  const mm = String(month).padStart(2, '0')
+  const key = `${user}/${year}/${mm}`
+  let list = monthGames.get(key)
+  if (!list) {
+    const data = await getJson<{ games?: ApiGame[] }>(
+      `https://api.chess.com/pub/player/${encodeURIComponent(user)}/games/${year}/${mm}`,
+      signal,
+    )
+    list = data.games || []
+    monthGames.set(key, list)
+  }
+  const byUrl = new Map<string, ApiGame>()
+  for (const item of list) if (item.url) byUrl.set(item.url, item)
+  const updated: LightGame[] = []
+  for (const game of games) {
+    if (game.moves || !game.url) continue
+    const raw = byUrl.get(game.url)
+    const played = raw?.pgn ? readLine(raw.pgn, book) : null
+    game.moves = played?.moves || game.line
+    updated.push(game)
+  }
+  return updated
+}
 
 export async function ensureMoves(game: LightGame, book: Book, signal: AbortSignal): Promise<string> {
   if (game.moves) return game.moves

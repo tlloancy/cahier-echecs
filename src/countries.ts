@@ -1,3 +1,5 @@
+import { serial } from './api.ts'
+
 const regions = new Intl.DisplayNames(['fr'], { type: 'region' })
 
 const extra: Record<string, string> = {
@@ -31,6 +33,10 @@ export function flagSrc(code: string, base: string): string {
 }
 
 export async function fetchCountry(username: string, signal: AbortSignal): Promise<string | null> {
+  return serial(() => readCountry(username, signal))
+}
+
+async function readCountry(username: string, signal: AbortSignal): Promise<string | null> {
   let response: Response | null = null
   for (let attempt = 0; attempt < 4; attempt += 1) {
     response = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(username)}`, { signal })
