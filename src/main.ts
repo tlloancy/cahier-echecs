@@ -19,7 +19,7 @@ import {
   tallyOf,
   winPercent,
 } from './stats.ts'
-import type { Book, Filters, Finding, LightGame, TreeNode } from './types.ts'
+import type { Book, Filters, Finding, LightGame, Tally, TreeNode } from './types.ts'
 
 const LAST_KEY = 'cahier-echecs-user'
 
@@ -54,7 +54,7 @@ const state: {
   games: [],
   countries: {},
   book: {},
-  filters: { color: 'all', tc: 'all', opp: null },
+  filters: { color: 'all', tc: 'all', result: 'all', country: null, opp: null },
   path: [],
   pins: [],
   flip: false,
@@ -93,10 +93,6 @@ function num(value: number): string {
   return value.toLocaleString('fr-FR')
 }
 
-function countLabel(value: number, singular: string, plural: string): string {
-  return `${num(value)} ${value === 1 ? singular : plural}`
-}
-
 function flagHtml(code: string): string {
   if (!/^[A-Z]{2}$/.test(code)) return ''
   const name = countryName(code)
@@ -116,17 +112,32 @@ function engineUrl(): string {
 }
 
 function currentView(): { games: LightGame[]; root: TreeNode; node: TreeNode } {
-  const key = `${state.generation}|${state.filters.color}|${state.filters.tc}|${state.filters.opp || ''}`
+  const key = `${state.generation}|${state.filters.color}|${state.filters.tc}|${state.filters.result}|${state.filters.country || ''}|${state.filters.opp || ''}`
   if (!treeCache || treeCache.key !== key) {
-    const games = selectGames(state.games, state.filters)
+    const games = selectGames(state.games, state.filters, state.countries)
     treeCache = { key, games, root: buildTree(games, state.book) }
   }
   state.path = clampPath(treeCache.root, state.path)
   return { games: treeCache.games, root: treeCache.root, node: nodeAt(treeCache.root, state.path) }
 }
 
-function bar(node: { games: number; w: number; d: number; l: number }): string {
+function share(part: number, whole: number): number {
+  if (!whole) return 0
+  return Math.round((part / whole) * 100)
+}
+
+function rate(part: Tally, whole: number): string {
+  if (state.filters.result === 'all') return `${winPercent(part)} %`
+  return `${share(part.games, whole)} %`
+}
+
+function bar(node: { games: number; w: number; d: number; l: number }, whole = node.games): string {
   if (!node.games) return '<span class="bar"></span>'
+  const result = state.filters.result
+  if (result !== 'all') {
+    const width = share(node.games, whole)
+    return `<span class="bar" aria-hidden="true"><i class="${result}" style="width:${width}%"></i></span>`
+  }
   const w = (node.w / node.games) * 100
   const d = (node.d / node.games) * 100
   const l = (node.l / node.games) * 100
@@ -184,8 +195,8 @@ function dashboard(): string {
               <span class="san">${esc(child.move)}</span>
               <span class="name">${esc(child.name)}</span>
               <span class="n">${num(child.games)}</span>
-              <span class="pct">${winPercent(child)} %</span>
-              ${bar(child)}
+              <span class="pct">${rate(child, node.games)}</span>
+              ${bar(child, node.games)}
             </button>
             <button type="button" class="icon pin" data-line="${esc(line)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${on ? 'Retirer' : 'Épingler'} ${esc(child.move)}" title="${on ? 'Retirer' : 'Épingler'}">${icons.pin}</button>
           </div>`
@@ -199,7 +210,7 @@ function dashboard(): string {
           const row = tallyOf(gamesOnLine(games, path))
           return `<li class="pin-row">
             <button type="button" class="text-btn" data-path="${esc(path.join('|'))}">${esc(line)}</button>
-            <span class="muted">${num(row.games)} · ${winPercent(row)} %</span>
+            <span class="muted">${num(row.games)} · ${rate(row, tally.games)}</span>
             <button type="button" class="icon" data-drop="${esc(line)}" aria-label="Retirer" title="Retirer">${icons.close}</button>
           </li>`
         })
@@ -214,11 +225,21 @@ function dashboard(): string {
       </div>`
     : ''
   const oppActive = state.filters.opp
-  return `<section class="summary">
-      <div><strong>${num(tally.games)}</strong> <span>parties</span></div>
-      <div><strong>${winPercent(tally)} %</strong> <span>de victoires</span></div>
-      <div><strong>${scorePercent(tally)} %</strong> <span>de score</span></div>
-      <div><span>${countLabel(tally.w, 'victoire', 'victoires')} · ${countLabel(tally.d, 'nulle', 'nulles')} · ${countLabel(tally.l, 'défaite', 'défaites')}</span></div>
+  const base = tallyOf(selectGames(state.games, { ...state.filters, result: 'all' }, state.countries))
+  const resultCards: Array<[Filters['result'], number, string, string]> = [
+    ['all', base.games, base.games === 1 ? 'partie' : 'parties', `${scorePercent(base)} % de score`],
+    ['w', base.w, base.w === 1 ? 'victoire' : 'victoires', `${winPercent(base)} % de victoires`],
+    ['d', base.d, base.d === 1 ? 'nulle' : 'nulles', 'Nulles'],
+    ['l', base.l, base.l === 1 ? 'défaite' : 'défaites', 'Défaites'],
+  ]
+  return `<section class="summary" role="group" aria-label="Résultat">
+      ${resultCards
+        .map(([value, count, label, title]) => {
+          const pressed = state.filters.result === value
+          const loss = value === 'l' ? ' loss' : ''
+          return `<button type="button" class="stat${loss}" data-result="${value}" aria-pressed="${pressed ? 'true' : 'false'}" title="${esc(title)}"><strong>${num(count)}</strong><span>${label}</span></button>`
+        })
+        .join('')}
     </section>
     <div class="filters">
       <div class="seg" role="group" aria-label="Couleur">
@@ -266,6 +287,11 @@ function dashboard(): string {
       <div class="side">
         <section class="panel">
           <div class="toolbar">
+            <h2 title="Pays">Pays</h2>
+            ${state.filters.country ? `<button type="button" class="icon" id="clear-country" aria-label="Tous les pays" title="Tous les pays">${icons.close}</button>` : ''}
+          </div>
+          <div class="country-strip" id="country-strip" role="group" aria-label="Pays">${countryButtons()}</div>
+          <div class="toolbar">
             <h2 class="icon-title" title="Adversaires">${icons.users}<span class="sr">Adversaires</span></h2>
             ${oppActive ? `<button type="button" class="icon" id="clear-opp" aria-label="Tous les adversaires" title="Tous les adversaires">${icons.close}</button>` : ''}
           </div>
@@ -279,7 +305,7 @@ function dashboard(): string {
               .map((row) => {
                 const active = oppActive === row.name.toLowerCase()
                 const code = state.countries[row.name.toLowerCase()] || ''
-                return `<li><button type="button" class="opp" data-opp="${esc(row.name)}" aria-pressed="${active ? 'true' : 'false'}"><span class="flag-slot" data-flag="${esc(row.name)}">${flagHtml(code)}</span><span>${esc(row.name)}</span><span class="muted">${num(row.games)}</span><span>${winPercent(row)} %</span></button></li>`
+                return `<li><button type="button" class="opp" data-opp="${esc(row.name)}" aria-pressed="${active ? 'true' : 'false'}"><span class="flag-slot" data-flag="${esc(row.name)}">${flagHtml(code)}</span><span>${esc(row.name)}</span><span class="muted">${num(row.games)}</span><span>${rate(row, tally.games)}</span></button></li>`
               })
               .join('') || '<li class="muted">Aucun adversaire dans cette sélection.</li>'}
           </ul>
@@ -296,23 +322,18 @@ function render(): void {
   const focus = document.activeElement instanceof HTMLElement ? document.activeElement.id : ''
   const caret = document.activeElement instanceof HTMLInputElement ? document.activeElement.selectionStart : null
   const loaded = state.games.length > 0
-  app.innerHTML = `<main class="wrap">
-    <header>
-      <h1 class="serif">Cahier d’échecs</h1>
-      <p class="lede">Tes ouvertures, tes scores, les lignes que tu épingles. Les parties restent dans ce navigateur.</p>
-    </header>
-    <section class="panel">
-      <form class="load" id="load-form">
+  const form = `<form class="load" id="load-form">
         <label>Pseudo Chess.com
           <input id="pseudo" name="pseudo" autocomplete="username" required value="${esc(state.draft)}" />
         </label>
         <button class="icon primary" type="submit" aria-label="${loaded ? 'Mettre à jour' : 'Charger'}" title="${loaded ? 'Mettre à jour' : 'Charger'}" ${state.phase === 'loading' ? 'disabled' : ''}>${loaded ? icons.refresh : icons.download}</button>
         ${state.phase === 'loading' ? `<button class="icon stop" type="button" id="cancel" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : ''}
-      </form>
-      <p id="status" class="status ${state.phase === 'error' ? 'error' : ''}" role="status">${esc(state.message)}</p>
-    </section>
-    ${loaded ? dashboard() : ''}
-  </main>`
+      </form>`
+  const status = `<p id="status" class="status ${state.phase === 'error' ? 'error' : ''}" role="status">${esc(state.message)}</p>`
+  const head = loaded
+    ? `<header class="top"><h1 class="serif">Cahier d’échecs</h1>${form}</header>${status}`
+    : `<header><h1 class="serif">Cahier d’échecs</h1><p class="lede">Tes ouvertures, tes scores, les lignes que tu épingles. Les parties restent dans ce navigateur.</p></header><section class="panel">${form}${status}</section>`
+  app.innerHTML = `<main class="wrap">${head}${loaded ? dashboard() : ''}</main>`
   bind()
   if (focus) {
     const field = document.getElementById(focus)
@@ -362,9 +383,55 @@ async function rememberCountries(): Promise<void> {
   state.countries = { ...state.countries, ...known }
 }
 
+function countryRows(): { code: string; games: number }[] {
+  const games = selectGames(state.games, { ...state.filters, country: null }, state.countries)
+  const counts = new Map<string, number>()
+  for (const game of games) {
+    const code = state.countries[game.opp.toLowerCase()] || ''
+    if (!/^[A-Z]{2}$/.test(code)) continue
+    counts.set(code, (counts.get(code) || 0) + 1)
+  }
+  if (state.filters.country && /^[A-Z]{2}$/.test(state.filters.country) && !counts.has(state.filters.country)) {
+    counts.set(state.filters.country, 0)
+  }
+  return [...counts]
+    .map(([code, games]) => ({ code, games }))
+    .sort((a, b) => b.games - a.games || countryName(a.code).localeCompare(countryName(b.code), 'fr'))
+}
+
+function countryButtons(): string {
+  return countryRows()
+    .map((row) => {
+      const name = countryName(row.code)
+      const pressed = state.filters.country === row.code
+      return `<button type="button" class="country" data-country="${esc(row.code)}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${esc(name)}" title="${esc(name)}">${flagHtml(row.code)}<span>${num(row.games)}</span></button>`
+    })
+    .join('')
+}
+
+function bindCountries(root: ParentNode): void {
+  for (const button of root.querySelectorAll<HTMLButtonElement>('[data-country]')) {
+    button.addEventListener('click', () => {
+      const code = button.dataset.country || ''
+      state.filters.country = state.filters.country === code ? null : code
+      render()
+    })
+  }
+}
+
+function paintCountryStrip(): void {
+  const strip = document.getElementById('country-strip')
+  if (!strip) return
+  const left = strip.scrollLeft
+  strip.innerHTML = countryButtons()
+  strip.scrollLeft = left
+  bindCountries(strip)
+}
+
 function showFlag(name: string, code: string): void {
   const slot = document.querySelector(`[data-flag="${CSS.escape(name)}"]`)
   if (slot && !slot.querySelector('img')) slot.innerHTML = flagHtml(code)
+  paintCountryStrip()
 }
 
 async function fillCountries(): Promise<void> {
@@ -430,7 +497,7 @@ async function load(username: string): Promise<void> {
     state.games = games
     state.pins = previousPins
     state.path = []
-    state.filters = { color: 'all', tc: 'all', opp: null }
+    state.filters = { color: 'all', tc: 'all', result: 'all', country: null, opp: null }
     state.generation += 1
     treeCache = null
     state.phase = 'ready'
@@ -495,6 +562,13 @@ function bind(): void {
   document.getElementById('pseudo')?.addEventListener('input', (event) => {
     state.draft = (event.target as HTMLInputElement).value
   })
+  for (const button of app.querySelectorAll<HTMLButtonElement>('[data-result]')) {
+    button.addEventListener('click', () => {
+      const value = button.dataset.result as Filters['result']
+      state.filters.result = value === 'all' || state.filters.result === value ? 'all' : value
+      render()
+    })
+  }
   for (const button of app.querySelectorAll<HTMLButtonElement>('[data-color]')) {
     button.addEventListener('click', () => {
       state.filters.color = button.dataset.color as Filters['color']
@@ -525,6 +599,11 @@ function bind(): void {
     }
     render()
   })
+  document.getElementById('clear-country')?.addEventListener('click', () => {
+    state.filters.country = null
+    render()
+  })
+  bindCountries(app)
   document.getElementById('clear-opp')?.addEventListener('click', () => {
     state.filters.opp = null
     render()

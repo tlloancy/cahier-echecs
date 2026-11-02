@@ -26,6 +26,8 @@ export type Book = Record<string, BookEntry>
 export interface Filters {
   color: 'all' | Side
   tc: 'all' | TimeClass
+  result: 'all' | GameResult
+  country: string | null
   opp: string | null
 }
 
