@@ -45,6 +45,7 @@ const state: {
   message: string
   analysis: AnalysisView | null
   generation: number
+  renaming: boolean
 } = {
   draft: '',
   user: '',
@@ -61,6 +62,7 @@ const state: {
   message: '',
   analysis: null,
   generation: 0,
+  renaming: false,
 }
 
 let filterCache: { key: string; games: LightGame[] } | null = null
@@ -378,16 +380,20 @@ function render(): void {
   const focus = document.activeElement instanceof HTMLElement ? document.activeElement.id : ''
   const caret = document.activeElement instanceof HTMLInputElement ? document.activeElement.selectionStart : null
   const loaded = state.games.length > 0
-  const form = `<form class="load" id="load-form">
-        <label>Pseudo Chess.com
+  const field = `<label>${loaded ? '<span class="sr">Pseudo Chess.com</span>' : 'Pseudo Chess.com'}
           <input id="pseudo" name="pseudo" autocomplete="username" required value="${esc(state.draft)}" />
-        </label>
+        </label>`
+  const identity = loaded && !state.renaming
+    ? `<button type="button" class="who" id="who">${esc(state.display || state.draft)}</button>`
+    : field
+  const form = `<form class="load" id="load-form">
+        ${identity}
         <button class="icon primary" type="submit" aria-label="${loaded ? 'Mettre à jour' : 'Charger'}" title="${loaded ? 'Mettre à jour' : 'Charger'}" ${state.phase === 'loading' ? 'disabled' : ''}>${loaded ? icons.refresh : icons.download}</button>
         ${state.phase === 'loading' ? `<button class="icon stop" type="button" id="cancel" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : ''}
       </form>`
   const status = `<p id="status" class="status ${state.phase === 'error' ? 'error' : ''}" role="status">${esc(state.message)}</p>`
   const head = loaded
-    ? `<header class="top"><h1 class="serif">Cahier d’échecs</h1>${form}</header>${status}`
+    ? `<header class="top"><div class="identity"><p class="eyebrow">Cahier d’échecs</p>${form}</div></header>${status}`
     : `<header><h1 class="serif">Cahier d’échecs</h1><p class="lede">Tes ouvertures, tes scores, les lignes que tu épingles. Les parties restent dans ce navigateur.</p></header><section class="panel">${form}${status}</section>`
   app.innerHTML = `<main class="wrap">${head}${loaded ? dashboard() : ''}</main>`
   bind()
@@ -708,10 +714,16 @@ async function startAnalysis(): Promise<void> {
 }
 
 function bind(): void {
+  document.getElementById('who')?.addEventListener('click', () => {
+    state.renaming = true
+    render()
+    document.getElementById('pseudo')?.focus()
+  })
   document.getElementById('load-form')?.addEventListener('submit', (event) => {
     event.preventDefault()
     const field = document.getElementById('pseudo') as HTMLInputElement | null
     state.draft = field?.value || state.draft
+    state.renaming = false
     void load(state.draft)
   })
   document.getElementById('cancel')?.addEventListener('click', () => loadAbort?.abort())

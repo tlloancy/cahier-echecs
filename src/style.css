@@ -60,15 +60,31 @@ h2 {
 
 header.top {
   display: flex;
-  flex-wrap: wrap;
   align-items: end;
-  gap: 1rem 2rem;
 }
 
-header.top h1 { font-size: 1.85rem; }
-header.top .load { margin: 0; }
-header.top label { min-width: min(100%, 16rem); }
-header.top + .status { margin-top: 0.7rem; }
+header.top .load { margin: 0; align-items: center; }
+header.top label { min-width: min(100%, 14rem); }
+header.top + .status { margin-top: 0.35rem; }
+
+.identity { display: grid; gap: 0.15rem; }
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+button.who {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", Georgia, serif;
+  font-size: 1.85rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
 
 .panel {
   margin-top: 1.5rem;
@@ -403,5 +419,5 @@ button.icon.pin[aria-pressed="true"] { color: var(--wax); background: #fff6f2; b
   .tree-go { grid-template-columns: 3rem minmax(0, 1fr) auto; }
   .tree-go .pct, .tree-go .bar { display: none; }
   h1 { font-size: 2rem; }
-  header.top h1 { font-size: 1.6rem; }
+  button.who { font-size: 1.6rem; }
 }
