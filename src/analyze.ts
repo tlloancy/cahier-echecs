@@ -5,7 +5,7 @@ import { makeSan, parseSan } from 'chessops/san'
 import { parseUci } from 'chessops/util'
 import { ensureMoves } from './api.ts'
 import { writeGame } from './db.ts'
-import { Engine, whiteCentipawns } from './engine.ts'
+import { centipawnLoss, Engine } from './engine.ts'
 import { gamesOnLine } from './stats.ts'
 import type { Book, Finding, LightGame } from './types.ts'
 
@@ -107,10 +107,7 @@ export async function analyzeLine(
               continue
             }
             if (hooks.stopped() || !follow) break
-            const loss =
-              side === 'white'
-                ? whiteCentipawns(answer) - whiteCentipawns(follow)
-                : whiteCentipawns(follow) - whiteCentipawns(answer)
+            const loss = centipawnLoss(answer, follow, side)
             if (loss >= FAILLE_CP) {
               const row: Finding = {
                 url: game.url,

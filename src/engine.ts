@@ -105,7 +105,14 @@ export class Engine {
   }
 }
 
-export function whiteCentipawns(score: EngineScore): number {
-  if (score.mate != null) return score.mate > 0 ? 100000 - score.mate : -100000 - score.mate
-  return score.cp ?? 0
+export type SideToMove = 'white' | 'black'
+
+export function whiteCentipawns(score: EngineScore, sideToMove: SideToMove): number {
+  const raw = score.mate != null ? (score.mate > 0 ? 100000 - score.mate : -100000 - score.mate) : (score.cp ?? 0)
+  return sideToMove === 'black' ? -raw : raw
+}
+
+export function centipawnLoss(answer: EngineScore, follow: EngineScore, sideToMove: SideToMove): number {
+  const other: SideToMove = sideToMove === 'white' ? 'black' : 'white'
+  return whiteCentipawns(answer, sideToMove) - whiteCentipawns(follow, other)
 }
