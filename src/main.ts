@@ -2,7 +2,7 @@ import './style.css'
 import { analyzeLine } from './analyze.ts'
 import { boardHtml } from './board.ts'
 import { icons } from './icons.ts'
-import { loadBook } from './book.ts'
+import { loadBook, MAX_PLIES, nameAlong } from './book.ts'
 import { loadPlayer } from './api.ts'
 import { countryName, fetchCountry, flagSrc } from './countries.ts'
 import { onDatabaseBlocked, readCountries, readUser, writeCountry, writePins, writeUser } from './db.ts'
@@ -202,14 +202,19 @@ function dashboard(): string {
           </div>`
         })
         .join('')
-    : '<p class="muted">Pas de coup suivant dans cette sélection.</p>'
+    : `<p class="muted">${state.path.length >= MAX_PLIES ? 'Fin des douze premiers coups.' : 'Pas de coup suivant dans cette sélection.'}</p>`
   const pins = state.pins.length
     ? `<ul class="pin-list">${state.pins
         .map((line) => {
           const path = line.split(' ')
           const row = tallyOf(gamesOnLine(games, path))
+          const title = nameAlong(path, state.book) || line
+          const moves = title === line ? '' : `<span class="pin-moves">${esc(line)}</span>`
           return `<li class="pin-row">
-            <button type="button" class="text-btn" data-path="${esc(path.join('|'))}">${esc(line)}</button>
+            <button type="button" class="text-btn" data-path="${esc(path.join('|'))}" aria-label="${esc(title)}">
+              <span class="pin-title">${esc(title)}</span>
+              ${moves}
+            </button>
             <span class="muted">${num(row.games)} · ${rate(row, tally.games)}</span>
             <button type="button" class="icon" data-drop="${esc(line)}" aria-label="Retirer" title="Retirer">${icons.close}</button>
           </li>`
@@ -296,10 +301,11 @@ function dashboard(): string {
           <h2>${node.name ? esc(node.name) : 'Ouvertures'}</h2>
           <span class="toolbar-actions">
             ${state.path.length ? `<button type="button" class="icon pin" id="pin-here" aria-pressed="${pinnedHere ? 'true' : 'false'}" aria-label="${pinnedHere ? 'Retirer cette ligne' : 'Épingler cette ligne'}" title="${pinnedHere ? 'Retirer' : 'Épingler'}">${icons.pin}</button>` : ''}
-            ${state.path.length ? (state.analysis?.running ? `<button type="button" class="icon stop" id="stop-analysis" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : `<button type="button" class="icon primary" id="analyze" aria-label="Analyser" title="Analyser">${icons.search}</button>`) : ''}
+            ${state.path.length ? (state.analysis?.running ? `<button type="button" class="icon stop" id="stop-analysis" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : `<button type="button" class="icon primary" id="analyze" aria-label="Quelques parties, un mauvais coup" title="Quelques parties, un mauvais coup">${icons.search}</button>`) : ''}
           </span>
         </div>
-        <p class="position-name">${state.path.length ? esc(state.path.join(' ')) : 'Les douze premiers coups. Le nom vient du livre d’ouvertures.'}</p>
+        <p class="note">Douze premiers coups seulement. La loupe regarde quelques parties et signale un mauvais coup.</p>
+        ${state.path.length ? `<p class="position-name">${esc(state.path.join(' '))}</p>` : ''}
         <nav class="crumbs">${crumbs}</nav>
         <div class="opening-grid">
           <div class="tree">${tree}</div>
