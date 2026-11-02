@@ -353,7 +353,7 @@ function go(path: string[]): void {
 }
 
 function opponentNames(): string[] {
-  return [...new Set(state.games.map((game) => game.opp))]
+  return opponentRows(state.games).map((row) => row.name)
 }
 
 async function rememberCountries(): Promise<void> {
@@ -376,10 +376,11 @@ async function fillCountries(): Promise<void> {
     if (controller.signal.aborted) return
     try {
       const code = await fetchCountry(name, controller.signal)
-      if (!code || controller.signal.aborted) continue
-      state.countries[name.toLowerCase()] = code
-      await writeCountry(name, code)
-      showFlag(name, code)
+      if (controller.signal.aborted) return
+      const saved = code || '-'
+      state.countries[name.toLowerCase()] = saved
+      await writeCountry(name, saved)
+      if (code) showFlag(name, code)
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
     }
