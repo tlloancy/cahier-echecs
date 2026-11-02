@@ -283,6 +283,13 @@ function dashboard(): string {
       </div>
       <button type="button" class="icon" id="flip" aria-label="${state.flip ? 'Côté blancs' : 'Retourner l’échiquier'}" title="${state.flip ? 'Côté blancs' : 'Retourner'}">${icons.flip}</button>
     </div>
+    <section class="panel countries">
+      <div class="toolbar">
+        <h2 title="Pays">Pays</h2>
+        ${state.filters.country ? `<button type="button" class="icon" id="clear-country" aria-label="Tous les pays" title="Tous les pays">${icons.close}</button>` : ''}
+      </div>
+      <div class="country-strip" id="country-strip" role="group" aria-label="Pays">${countryButtons()}</div>
+    </section>
     <div class="layout">
       <section class="panel">
         <div class="toolbar">
@@ -302,11 +309,6 @@ function dashboard(): string {
       </section>
       <div class="side">
         <section class="panel">
-          <div class="toolbar">
-            <h2 title="Pays">Pays</h2>
-            ${state.filters.country ? `<button type="button" class="icon" id="clear-country" aria-label="Tous les pays" title="Tous les pays">${icons.close}</button>` : ''}
-          </div>
-          <div class="country-strip" id="country-strip" role="group" aria-label="Pays">${countryButtons()}</div>
           <div class="toolbar">
             <h2 class="icon-title" title="Adversaires">${icons.users}<span class="sr">Adversaires</span></h2>
             ${oppActive ? `<button type="button" class="icon" id="clear-opp" aria-label="Tous les adversaires" title="Tous les adversaires">${icons.close}</button>` : ''}
