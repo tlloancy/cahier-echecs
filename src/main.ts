@@ -149,7 +149,7 @@ function moveLabel(ply: number, san: string): string {
   return ply % 2 === 1 ? `${move}. ${san}` : `${move}… ${san}`
 }
 
-function findingList(mark: string, label: string, rows: Finding[], empty: string, kind: 'faille' | 'decisif'): string {
+function findingList(mark: string, label: string, hint: string, rows: Finding[], empty: string, kind: 'faille' | 'decisif'): string {
   const items = rows.length
     ? rows
         .map((row) => {
@@ -162,7 +162,7 @@ function findingList(mark: string, label: string, rows: Finding[], empty: string
         })
         .join('')
     : `<li class="muted">${esc(empty)}</li>`
-  return `<section class="findings"><h2 class="icon-title" title="${esc(label)}">${mark}<span class="sr">${esc(label)}</span></h2><ul class="finding-list">${items}</ul></section>`
+  return `<section class="findings"><h2 class="icon-title">${mark}<span>${esc(label)}</span></h2><p class="note">${esc(hint)}</p><ul class="finding-list">${items}</ul></section>`
 }
 
 function dashboard(): string {
@@ -225,8 +225,8 @@ function dashboard(): string {
   const analysisHtml = analysis
     ? `<div id="analysis">
         <p id="analysis-status" class="status ${analysis.running ? 'running' : ''}">${esc(analysis.status)}</p>
-        ${findingList(icons.alert, 'Failles', analysis.failles, 'Aucune faille dans cet échantillon.', 'faille')}
-        ${findingList(icons.spark, 'Coups décisifs', analysis.decisifs, 'Aucun coup décisif dans cet échantillon.', 'decisif')}
+        ${findingList(icons.alert, 'Failles', 'Un coup moins bon, dans une des parties regardées.', analysis.failles, 'Aucune faille dans ces parties.', 'faille')}
+        ${findingList(icons.spark, 'Coups décisifs', 'Tu donnes du matériel, et c’est quand même le bon coup.', analysis.decisifs, 'Aucun dans ces parties.', 'decisif')}
       </div>`
     : ''
   const oppActive = state.filters.opp

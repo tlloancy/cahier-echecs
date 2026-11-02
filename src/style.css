@@ -272,6 +272,7 @@ button.icon.pin[aria-pressed="true"] { color: var(--wax); background: #fff6f2; b
   border: 0;
 }
 .status.running { color: var(--ink); }
+.findings h2 { margin-bottom: 0.15rem; }
 .finding-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.35rem; align-items: center; }
 .finding {
   display: grid;
