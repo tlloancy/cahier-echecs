@@ -5,7 +5,7 @@ import { icons } from './icons.ts'
 import { loadBook, nameAlong } from './book.ts'
 import { completeMonth, loadPlayer, loadPlayerSince, releaseMonths } from './api.ts'
 import { countryName, fetchCountry, flagSrc } from './countries.ts'
-import { mergeUser, onDatabaseBlocked, readCountries, readUser, writeCountry, writeGames, writePins, writeUser } from './db.ts'
+import { mergeUser, onDatabaseBlocked, readCountries, readUser, unsaved, writeCountry, writeGames, writePins, writeUser } from './db.ts'
 import { Engine } from './engine.ts'
 import {
   gamesOnLine,
@@ -592,7 +592,7 @@ async function fillMoves(signal: AbortSignal): Promise<void> {
     if (currentView().rows.length > before) render()
   }
   releaseMonths()
-  setMessage(`${num(state.games.length)} parties en mémoire.`)
+  setMessage(unsaved() ? 'Mode sans sauvegarde' : `${num(state.games.length)} parties en mémoire.`)
 }
 
 async function fillBackground(): Promise<void> {
@@ -665,7 +665,11 @@ async function load(username: string, full = false): Promise<void> {
       games = fresh
       await writeUser(user, games, display, previousPins)
     }
-    localStorage.setItem(LAST_KEY, user)
+    try {
+      localStorage.setItem(LAST_KEY, user)
+    } catch {
+      state.message = 'Mode sans sauvegarde'
+    }
     state.user = user
     state.display = display
     state.draft = display
@@ -680,7 +684,9 @@ async function load(username: string, full = false): Promise<void> {
     stepCache = null
     state.phase = 'ready'
     state.progress = null
-    state.message = `${num(games.length)} parties ${incremental ? 'en mémoire' : 'chargées'}.`
+    state.message = unsaved()
+      ? 'Mode sans sauvegarde'
+      : `${num(games.length)} parties ${incremental ? 'en mémoire' : 'chargées'}.`
     await rememberCountries()
     render()
     void fillBackground()
@@ -893,9 +899,15 @@ async function boot(): Promise<void> {
     render()
     return
   }
-  const last = localStorage.getItem(LAST_KEY)
+  let last = ''
+  try {
+    last = localStorage.getItem(LAST_KEY) || ''
+  } catch {
+    state.message = 'Mode sans sauvegarde'
+  }
   if (last) await restore(last)
-  else state.message = ''
+  else if (!unsaved()) state.message = ''
+  if (unsaved()) state.message = 'Mode sans sauvegarde'
   await rememberCountries()
   state.phase = state.games.length ? 'ready' : 'idle'
   render()
