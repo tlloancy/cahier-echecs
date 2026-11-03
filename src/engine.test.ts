@@ -4,7 +4,7 @@ import { centipawnLoss, type EngineScore } from './engine.ts'
 const FAILLE_CP = 150
 
 function score(cp: number): EngineScore {
-  return { uci: 'e2e4', cp, mate: null }
+  return { uci: 'e2e4', cp, mate: null, pv: ['e2e4'] }
 }
 
 describe('centipawnLoss', () => {

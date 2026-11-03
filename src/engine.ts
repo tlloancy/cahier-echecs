@@ -2,6 +2,7 @@ export interface EngineScore {
   uci: string
   cp: number | null
   mate: number | null
+  pv: string[]
 }
 
 function readScore(lines: string[]): { cp: number | null; mate: number | null } {
@@ -20,6 +21,16 @@ function readScore(lines: string[]): { cp: number | null; mate: number | null } 
     }
   }
   return { cp, mate }
+}
+
+function readPv(lines: string[]): string[] {
+  let pv: string[] = []
+  for (const line of lines) {
+    const at = line.indexOf(' pv ')
+    if (at === -1) continue
+    pv = line.slice(at + 4).trim().split(/\s+/).filter(Boolean)
+  }
+  return pv
 }
 
 interface SearchWaiter {
@@ -54,7 +65,8 @@ export class Engine {
             window.clearTimeout(waiter.timer)
             const uci = line.split(/\s+/)[1] || ''
             const score = readScore(waiter.lines)
-            waiter.resolve({ uci, ...score })
+            const pv = readPv(waiter.lines)
+            waiter.resolve({ uci, ...score, pv: pv.length ? pv : uci ? [uci] : [] })
           } else {
             this.pending.lines.push(line)
           }
