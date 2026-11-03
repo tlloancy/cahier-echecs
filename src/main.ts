@@ -414,7 +414,6 @@ function render(): void {
   const form = `<form class="load" id="load-form">
         ${identity}
         <button class="icon primary" type="submit" aria-label="${loaded ? 'Mettre à jour' : 'Charger'}" title="${loaded ? 'Mettre à jour' : 'Charger'}" ${state.phase === 'loading' ? 'disabled' : ''}>${loaded ? icons.refresh : icons.download}</button>
-        ${loaded ? `<button type="button" class="ghost" id="reload-all" ${state.phase === 'loading' ? 'disabled' : ''}>Tout retélécharger</button>` : ''}
         ${state.phase === 'loading' ? `<button class="icon stop" type="button" id="cancel" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : ''}
       </form>`
   const ratio = state.progress == null ? 0 : Math.round(state.progress * 100)
@@ -827,10 +826,6 @@ function bind(): void {
     state.draft = field?.value || state.draft
     state.renaming = false
     void load(state.draft)
-  })
-  document.getElementById('reload-all')?.addEventListener('click', () => {
-    state.renaming = false
-    void load(state.display || state.draft, true)
   })
   document.getElementById('cancel')?.addEventListener('click', () => loadAbort?.abort())
   document.getElementById('pseudo')?.addEventListener('input', (event) => {

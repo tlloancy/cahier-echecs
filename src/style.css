@@ -116,15 +116,14 @@ input:focus, select:focus, button:focus-visible {
   outline-offset: 2px;
 }
 
-button.primary, button.ghost, button.stop {
+button.primary, button.stop {
   min-height: 2.6rem;
   border-radius: 8px;
   padding: 0.45rem 0.9rem;
 }
 
 button.primary { background: var(--ink); color: #f7f2e8; border: 1px solid var(--ink); }
-button.ghost, button.stop { background: transparent; border: 1px solid var(--line); }
-button.stop { border-color: var(--wax); color: var(--wax); }
+button.stop { background: transparent; border: 1px solid var(--wax); color: var(--wax); }
 button:disabled { opacity: 0.55; cursor: default; }
 
 .status { min-height: 1.4rem; margin: 0.8rem 0 0; color: var(--muted); }
