@@ -300,6 +300,14 @@ button.icon.stop { color: var(--wax); border-color: var(--wax); }
 button.icon[aria-pressed="true"] { background: var(--ink); color: #f6f0e6; border-color: var(--ink); }
 button.icon.pin[aria-pressed="true"] { color: var(--wax); background: #fff6f2; border-color: var(--wax); }
 .ico { width: 1.15rem; height: 1.15rem; display: block; }
+.ico.tc-bullet { color: #5c5854; }
+.ico.tc-blitz { color: #e2a308; }
+.ico.tc-rapid { color: #6ea33a; }
+.ico.tc-daily { color: #e08a1e; }
+button.icon[aria-pressed="true"] .ico.tc-bullet,
+button.icon[aria-pressed="true"] .ico.tc-blitz,
+button.icon[aria-pressed="true"] .ico.tc-rapid,
+button.icon[aria-pressed="true"] .ico.tc-daily { color: inherit; }
 .toolbar-actions, .seg { display: flex; gap: 0.35rem; align-items: center; }
 .seg.words button {
   width: auto;

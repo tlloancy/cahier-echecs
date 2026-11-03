@@ -321,10 +321,10 @@ function dashboard(): string {
       <div class="seg" role="group" aria-label="Cadence">
         ${([
           ['all', icons.rows, 'Toutes les cadences'],
-          ['bullet', icons.bolt, 'Bullet'],
-          ['blitz', icons.flame, 'Blitz'],
-          ['rapid', icons.clock, 'Rapide'],
-          ['daily', icons.calendar, 'Correspondance'],
+          ['bullet', icons.bullet, 'Bullet'],
+          ['blitz', icons.blitz, 'Blitz'],
+          ['rapid', icons.rapid, 'Rapide'],
+          ['daily', icons.daily, 'Quotidien'],
         ] as const)
           .map(
             ([value, mark, label]) =>

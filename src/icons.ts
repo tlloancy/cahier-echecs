@@ -1,5 +1,5 @@
-function svg(body: string): string {
-  return `<svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`
+function svg(body: string, tone = ''): string {
+  return `<svg class="ico${tone ? ` ${tone}` : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`
 }
 
 export const icons = {
@@ -14,10 +14,19 @@ export const icons = {
   alert: svg('<path d="M12 4 3.5 19h17z"/><path d="M12 10v4"/><path d="M12 17h.01"/>'),
   spark: svg('<path d="M12 3v6M12 15v6M3 12h6M15 12h6M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>'),
   users: svg('<circle cx="9" cy="9" r="3"/><circle cx="16" cy="10" r="2.2"/><path d="M3.5 19c.6-2.6 2.8-4 5.5-4s4.9 1.4 5.5 4"/><path d="M14 15.2c1.6-.4 3.2.2 4.2 1.8"/>'),
-  bolt: svg('<path d="M13 3 6 13h6l-1 8 7-10h-6z"/>'),
-  flame: svg('<path d="M12 3s4 4 4 8a4 4 0 1 1-8 0c0-1.5.8-3 2-4 0 2 1.2 2.8 2 2.8C12 8 12 5 12 3z"/>'),
-  clock: svg('<circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/>'),
-  calendar: svg('<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 10h16"/>'),
+  bullet: svg(
+    '<g transform="rotate(-38 12 12)" fill="currentColor" stroke="none"><path d="M4.8 10.3h7.4l5.8 1.7-5.8 1.7H4.8a1.1 1.1 0 0 1-1.1-1.1v-1.2a1.1 1.1 0 0 1 1.1-1.1z"/><path d="M7.1 10.5v3" stroke="#f4efe6" stroke-width="1.1" fill="none"/></g>',
+    'tc-bullet',
+  ),
+  blitz: svg('<path fill="currentColor" stroke="none" d="M13.2 2.6 5.4 13.2h6.1l-1.3 8.2 8.4-11.2h-6.2z"/>', 'tc-blitz'),
+  rapid: svg(
+    '<path d="M9.2 3.4h5.6"/><path d="M12 3.4v2"/><path d="M16.6 6.2 18 4.8"/><circle cx="12" cy="13.2" r="6.5"/><path d="M12 13.2V9.4"/><path d="M12 13.2 14.4 14.6"/>',
+    'tc-rapid',
+  ),
+  daily: svg(
+    '<circle cx="12" cy="12" r="3.15" fill="currentColor" stroke="none"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.2 5.2l1.7 1.7M17.1 17.1l1.7 1.7M18.8 5.2l-1.7 1.7M6.9 17.1 5.2 18.8"/>',
+    'tc-daily',
+  ),
   link: svg('<path d="M14 6h4v4"/><path d="M10 14 18 6"/><path d="M10 6H6v12h12v-4"/>'),
   both: svg('<circle cx="12" cy="12" r="7"/><path d="M12 5a7 7 0 0 0 0 14z" fill="currentColor" stroke="none"/>'),
   rows: svg('<path d="M5 7h14M5 12h14M5 17h14"/>'),
