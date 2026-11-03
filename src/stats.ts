@@ -117,6 +117,70 @@ export function nextRows(games: LightGame[], path: string[], book: Book): { here
   return { here, name, rows }
 }
 
+export interface LossRow {
+  name: string
+  path: string[]
+  games: number
+  score: number
+}
+
+export function losingOpenings(games: LightGame[], book: Book): LossRow[] {
+  const groups = new Map<string, { tally: Tally; paths: Map<string, number> }>()
+  for (const game of games) {
+    const pos = Chess.default()
+    let name = ''
+    let path: string[] = []
+    const walked: string[] = []
+    let quiet = 0
+    for (const san of playedLine(game).split(' ')) {
+      if (!san) continue
+      const move = parseSan(pos, san)
+      if (!move) break
+      pos.play(move)
+      walked.push(san)
+      const hit = book[epd(pos)]
+      if (hit) {
+        name = hit.name
+        path = walked.slice()
+        quiet = 0
+      } else if (name) {
+        quiet += 1
+        if (quiet >= 6) break
+      }
+      if (walked.length >= 30) break
+    }
+    if (!name) continue
+    let group = groups.get(name)
+    if (!group) {
+      group = { tally: emptyTally(), paths: new Map() }
+      groups.set(name, group)
+    }
+    addResult(group.tally, game.result)
+    const key = path.join('|')
+    group.paths.set(key, (group.paths.get(key) || 0) + 1)
+  }
+  const rows: LossRow[] = []
+  for (const [name, group] of groups) {
+    if (group.tally.games < 10) continue
+    let bestPath = ''
+    let bestCount = -1
+    for (const [key, count] of group.paths) {
+      if (count > bestCount) {
+        bestCount = count
+        bestPath = key
+      }
+    }
+    rows.push({
+      name,
+      path: bestPath ? bestPath.split('|') : [],
+      games: group.tally.games,
+      score: scorePercent(group.tally),
+    })
+  }
+  rows.sort((a, b) => a.score - b.score || b.games - a.games || a.name.localeCompare(b.name, 'fr'))
+  return rows.slice(0, 5)
+}
+
 export function gamesOnLine(games: LightGame[], path: string[]): LightGame[] {
   return games.filter((game) => onLine(playedLine(game), path)).sort((a, b) => b.end - a.end)
 }

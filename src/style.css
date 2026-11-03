@@ -130,6 +130,20 @@ button:disabled { opacity: 0.55; cursor: default; }
 .status { min-height: 1.4rem; margin: 0.8rem 0 0; color: var(--muted); }
 .status.error { color: var(--wax); }
 
+.loss-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; }
+.loss-list button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 0.8rem;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0.45rem 0.7rem;
+}
+.loss-list button:hover { background: var(--paper-2); }
+
 .progress {
   margin-top: 0.45rem;
   height: 0.35rem;

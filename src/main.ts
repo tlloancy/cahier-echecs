@@ -9,6 +9,7 @@ import { mergeUser, onDatabaseBlocked, readCountries, readUser, unsaved, writeCo
 import { Engine } from './engine.ts'
 import {
   gamesOnLine,
+  losingOpenings,
   nextRows,
   opponentRows,
   scorePercent,
@@ -16,6 +17,7 @@ import {
   tallyOf,
   winPercent,
   type ContRow,
+  type LossRow,
 } from './stats.ts'
 import type { Book, Filters, Finding, LightGame, Tally } from './types.ts'
 
@@ -69,6 +71,7 @@ const state: {
 
 let filterCache: { key: string; games: LightGame[] } | null = null
 let stepCache: { key: string; here: Tally; name: string; rows: ContRow[] } | null = null
+let lossCache: { key: string; rows: LossRow[] } | null = null
 let loadAbort: AbortController | null = null
 let countryAbort: AbortController | null = null
 let analysisJob = 0
@@ -214,6 +217,21 @@ function loupeSection(): string {
     </section>`
 }
 
+function lossSection(): string {
+  const key = String(state.generation)
+  if (!lossCache || lossCache.key !== key) lossCache = { key, rows: losingOpenings(state.games, state.book) }
+  const rows = lossCache.rows
+  const list = rows.length
+    ? `<ul class="loss-list">${rows
+        .map(
+          (row) =>
+            `<li><button type="button" data-path="${esc(row.path.join('|'))}"><span>${esc(row.name)}</span><span class="muted">${num(row.games)}</span><span>${row.score} %</span></button></li>`,
+        )
+        .join('')}</ul>`
+    : '<p class="muted">Pas encore dix parties dans une ouverture.</p>'
+  return `<section class="panel losses"><h2>Où je perds des points</h2>${list}</section>`
+}
+
 function dashboard(): string {
   const { games, here: spot, name, rows } = currentView()
   const tally = tallyOf(games)
@@ -337,6 +355,7 @@ function dashboard(): string {
       </div>
       <div class="country-strip" id="country-strip" role="group" aria-label="Pays">${countryButtons()}</div>
     </section>
+    ${lossSection()}
     <div class="layout">
       <section class="panel">
         <div class="toolbar">

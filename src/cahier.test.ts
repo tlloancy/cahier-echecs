@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { epd } from './book.ts'
 import { whiteCentipawns, type EngineScore } from './engine.ts'
 import { readLine } from './lighten.ts'
-import { nextRows, scorePercent } from './stats.ts'
+import { losingOpenings, nextRows, scorePercent } from './stats.ts'
 import type { LightGame } from './types.ts'
 
 function game(patch: Partial<LightGame> & Pick<LightGame, 'id' | 'line' | 'result'>): LightGame {
@@ -59,6 +59,24 @@ describe('scorePercent', () => {
   it('compte la nulle comme un demi-point', () => {
     expect(scorePercent({ games: 10, w: 3, d: 2, l: 5 })).toBe(40)
     expect(scorePercent({ games: 0, w: 0, d: 0, l: 0 })).toBe(0)
+  })
+})
+
+describe('losingOpenings', () => {
+  it('garde les ouvertures d’au moins dix parties, les plus faibles d’abord', () => {
+    const pos = Chess.default()
+    const move = parseSan(pos, 'e4')
+    pos.play(move!)
+    const book = { [epd(pos)]: { eco: 'C20', name: 'King’s Pawn' } }
+    const games = []
+    for (let i = 0; i < 9; i += 1) games.push(game({ id: `l${i}`, line: 'e4 e5', result: 'l' }))
+    expect(losingOpenings(games, book)).toHaveLength(0)
+    games.push(game({ id: 'l9', line: 'e4 e5', result: 'l' }))
+    const shown = losingOpenings(games, book)
+    expect(shown).toHaveLength(1)
+    expect(shown[0].name).toBe('King’s Pawn')
+    expect(shown[0].score).toBe(0)
+    expect(shown[0].path).toEqual(['e4'])
   })
 })
 
