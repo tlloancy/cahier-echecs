@@ -155,6 +155,10 @@ function bar(node: { games: number; w: number; d: number; l: number }, whole = n
   return `<span class="bar" aria-hidden="true"><i class="w" style="width:${w}%"></i><i class="d" style="width:${d}%"></i><i class="l" style="width:${l}%"></i></span>`
 }
 
+function playableUrl(url: string): string {
+  return url.startsWith('https://www.chess.com/') ? url : ''
+}
+
 function moveLabel(ply: number, san: string): string {
   const move = Math.ceil(ply / 2)
   return ply % 2 === 1 ? `${move}. ${san}` : `${move}… ${san}`
@@ -165,8 +169,9 @@ function findingList(mark: string, label: string, hint: string, rows: Finding[],
   const items = rows.length
     ? rows
         .map((row) => {
-          const link = row.url
-            ? `<a class="icon-link" href="${esc(row.url)}" target="_blank" rel="noreferrer" aria-label="Partie contre ${esc(row.opp)}" title="Partie contre ${esc(row.opp)}">${icons.link}</a>`
+          const href = playableUrl(row.url)
+          const link = href
+            ? `<a class="icon-link" href="${esc(href)}" target="_blank" rel="noreferrer" aria-label="Partie contre ${esc(row.opp)}" title="Partie contre ${esc(row.opp)}">${icons.link}</a>`
             : ''
           const detail = kind === 'faille' ? `${moveLabel(row.ply, row.san)} → ${row.best}` : moveLabel(row.ply, row.san)
           const loss = kind === 'faille' ? `<span class="loss">−${num(row.cpl)}</span>` : ''

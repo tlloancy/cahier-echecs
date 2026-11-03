@@ -1,7 +1,7 @@
 import { Chess } from 'chessops/chess'
 import { parseSan } from 'chessops/san'
 import { epd } from './book.ts'
-import type { Book, Filters, GameResult, LightGame, OppRow, Tally, TimeClass, TreeNode } from './types.ts'
+import type { Book, Filters, GameResult, LightGame, OppRow, Tally, TimeClass } from './types.ts'
 
 export function emptyTally(): Tally {
   return { games: 0, w: 0, d: 0, l: 0 }
@@ -44,63 +44,6 @@ export function tallyOf(games: LightGame[]): Tally {
   const tally = emptyTally()
   for (const game of games) addResult(tally, game.result)
   return tally
-}
-
-function emptyNode(move: string): TreeNode {
-  return { move, name: '', games: 0, w: 0, d: 0, l: 0, children: new Map() }
-}
-
-export function buildTree(games: LightGame[], book: Book): TreeNode {
-  const root = emptyNode('')
-  for (const game of games) {
-    addResult(root, game.result)
-    if (!game.line) continue
-    const pos = Chess.default()
-    let node = root
-    let name = ''
-    for (const san of game.line.split(' ')) {
-      const move = parseSan(pos, san)
-      if (!move) break
-      pos.play(move)
-      const hit = book[epd(pos)]
-      if (hit) name = hit.name
-      let child = node.children.get(san)
-      if (!child) {
-        child = emptyNode(san)
-        node.children.set(san, child)
-      }
-      if (name) child.name = name
-      addResult(child, game.result)
-      node = child
-    }
-  }
-  return root
-}
-
-export function nodeAt(root: TreeNode, path: string[]): TreeNode {
-  let node = root
-  for (const san of path) {
-    const child = node.children.get(san)
-    if (!child) return node
-    node = child
-  }
-  return node
-}
-
-export function clampPath(root: TreeNode, path: string[]): string[] {
-  const kept: string[] = []
-  let node = root
-  for (const san of path) {
-    const child = node.children.get(san)
-    if (!child) break
-    kept.push(san)
-    node = child
-  }
-  return kept
-}
-
-export function sortedChildren(node: TreeNode): TreeNode[] {
-  return [...node.children.values()].sort((a, b) => b.games - a.games || a.move.localeCompare(b.move, 'fr'))
 }
 
 export function opponentRows(games: LightGame[]): OppRow[] {

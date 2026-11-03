@@ -35,16 +35,6 @@ export interface Filters {
   opp: string | null
 }
 
-export interface TreeNode {
-  move: string
-  name: string
-  games: number
-  w: number
-  d: number
-  l: number
-  children: Map<string, TreeNode>
-}
-
 export interface OppRow {
   name: string
   games: number

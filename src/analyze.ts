@@ -3,7 +3,7 @@ import type { Color, Move } from 'chessops/types'
 import { makeFen } from 'chessops/fen'
 import { makeSan, parseSan } from 'chessops/san'
 import { parseUci } from 'chessops/util'
-import { ensureMoves, releaseMonths } from './api.ts'
+import { completeMonth, releaseMonths } from './api.ts'
 import { writeGame } from './db.ts'
 import { centipawnLoss, Engine, whiteCentipawns, type EngineScore } from './engine.ts'
 import { gamesOnLine } from './stats.ts'
@@ -75,10 +75,14 @@ export async function analyzeLine(
     const where = `Partie ${index + 1} sur ${sample.length} · ${game.opp}`
     hooks.onProgress(game.moves ? where : `${where} · lecture des coups`)
     const hadMoves = Boolean(game.moves)
-    let moves = game.line
+    let moves = game.moves || game.line
     try {
-      moves = await ensureMoves(game, book, hooks.signal)
-      if (!hadMoves && game.moves) await writeGame(game)
+      if (!hadMoves && game.end) {
+        const date = new Date(game.end * 1000)
+        await completeMonth(game.user, date.getUTCFullYear(), date.getUTCMonth() + 1, [game], book, hooks.signal)
+        moves = game.moves || game.line
+        if (game.moves) await writeGame(game)
+      }
     } catch (error) {
       if (hooks.stopped() || (error instanceof DOMException && error.name === 'AbortError')) break
     }

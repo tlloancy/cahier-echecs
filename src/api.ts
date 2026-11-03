@@ -73,29 +73,6 @@ export async function completeMonth(
   return updated
 }
 
-export async function ensureMoves(game: LightGame, book: Book, signal: AbortSignal): Promise<string> {
-  if (game.moves) return game.moves
-  if (!game.end || !game.url) return game.line
-  const date = new Date(game.end * 1000)
-  const year = date.getUTCFullYear()
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-  const key = `${game.user}/${year}/${month}`
-  let list = monthGames.get(key)
-  if (!list) {
-    const data = await getJson<{ games?: ApiGame[] }>(
-      `https://api.chess.com/pub/player/${encodeURIComponent(game.user)}/games/${year}/${month}`,
-      signal,
-    )
-    list = data.games || []
-    monthGames.set(key, list)
-  }
-  const raw = list.find((item) => item.url === game.url)
-  const played = raw?.pgn ? readLine(raw.pgn, book) : null
-  if (!played) return game.line
-  game.moves = played.moves
-  return game.moves
-}
-
 interface ParseWaiter {
   games: LightGame[]
   resolve: (games: LightGame[]) => void
