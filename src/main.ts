@@ -294,17 +294,17 @@ function dashboard(): string {
   for (const game of selectGames(state.games, { ...state.filters, ending: 'all' }, state.countries)) {
     if (game.how === 'mate' || game.how === 'resign' || game.how === 'time') endings[game.how] += 1
   }
-  const resultCards: Array<[Filters['result'], number, string, string]> = [
-    ['all', base.games, icons.pawn, 'Parties'],
+  const resultCards: Array<['w' | 'd' | 'l', number, string, string]> = [
     ['w', base.w, '✓', 'Victoires'],
     ['d', base.d, '½', 'Nulles'],
     ['l', base.l, '✗', 'Défaites'],
   ]
   return `<section class="summary" role="group" aria-label="Résultat">
+      <div class="stat total"><span class="mark">${icons.pawn}</span><strong>${num(base.games)}</strong></div>
       ${resultCards
         .map(([value, count, glyph, label]) => {
           const pressed = state.filters.result === value
-          return `<button type="button" class="stat ${value}" data-result="${value}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${label}" title="${label}"><span class="mark">${glyph}</span><strong>${num(count)}</strong></button>`
+          return `<button type="button" class="stat result ${value}" data-result="${value}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${label}" title="${label}"><span class="mark">${glyph}</span><strong>${num(count)}</strong></button>`
         })
         .join('')}
     </section>

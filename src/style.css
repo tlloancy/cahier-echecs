@@ -214,14 +214,23 @@ button:disabled { opacity: 0.55; cursor: default; }
   line-height: 1.1;
 }
 
-.stat:hover { border-color: var(--ink); }
-.stat[aria-pressed="true"] {
-  background: var(--ink);
-  color: #f6f0e6;
-  border-color: var(--ink);
+.stat.total {
+  background: transparent;
+  border-color: transparent;
+  cursor: default;
+  padding-left: 0.15rem;
 }
-.stat[aria-pressed="true"] .mark,
-.stat[aria-pressed="true"] strong { color: inherit; }
+.stat.result { border-width: 2px; }
+.stat.result.w { border-color: var(--win); }
+.stat.result.d { border-color: var(--draw); }
+.stat.result.l { border-color: var(--loss); }
+.stat.result:hover { background: var(--paper-2); }
+.stat.result[aria-pressed="true"] { color: #fff7f5; }
+.stat.result.w[aria-pressed="true"] { background: var(--win); border-color: var(--win); }
+.stat.result.d[aria-pressed="true"] { background: var(--draw); border-color: var(--draw); }
+.stat.result.l[aria-pressed="true"] { background: var(--loss); border-color: var(--loss); }
+.stat.result[aria-pressed="true"] .mark,
+.stat.result[aria-pressed="true"] strong { color: #fff7f5; }
 
 .filters {
   display: flex;
