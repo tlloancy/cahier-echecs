@@ -139,9 +139,24 @@ function share(part: number, whole: number): number {
   return Math.round((part / whole) * 100)
 }
 
+function shownScore(part: Tally, whole: number): number {
+  if (state.filters.result === 'all') return winPercent(part)
+  return share(part.games, whole)
+}
+
 function rate(part: Tally, whole: number): string {
-  if (state.filters.result === 'all') return `${winPercent(part)} %`
-  return `${share(part.games, whole)} %`
+  return `${shownScore(part, whole)} %`
+}
+
+function gauge(score: number): string {
+  const tone = score >= 55 ? 'w' : score <= 45 ? 'l' : 'd'
+  const width = Math.max(0, Math.min(100, score))
+  return `<span class="gauge" role="img" aria-label="${score} %"><i class="${tone}" style="width:${width}%"></i></span>`
+}
+
+function scoreHead(lead: number, extra = ''): string {
+  const pads = Array.from({ length: lead }, () => '<span></span>').join('')
+  return `<div class="score-head${extra ? ` ${extra}` : ''}" aria-hidden="true">${pads}<span>${icons.pawn}</span><span>${icons.meter}</span><span></span></div>`
 }
 
 function bar(node: { games: number; w: number; d: number; l: number }, whole = node.games): string {
@@ -221,10 +236,10 @@ function lossSection(): string {
   if (!lossCache || lossCache.key !== key) lossCache = { key, rows: losingOpenings(state.games, state.book) }
   const rows = lossCache.rows
   const list = rows.length
-    ? `<ul class="loss-list">${rows
+    ? `${scoreHead(1, 'loss')}<ul class="loss-list">${rows
         .map(
           (row) =>
-            `<li><button type="button" data-path="${esc(row.path.join('|'))}"><span>${esc(row.name)}</span><span class="muted">${num(row.games)}</span><span>${row.score} %</span></button></li>`,
+            `<li><button type="button" data-path="${esc(row.path.join('|'))}"><span class="name">${esc(row.name)}</span><span class="n">${icons.pawn}${num(row.games)}</span>${gauge(row.score)}<span class="chev">${icons.chevron}</span></button></li>`,
         )
         .join('')}</ul>`
     : '<p class="muted">Pas encore dix parties dans une ouverture.</p>'
@@ -261,15 +276,19 @@ function dashboard(): string {
             <button type="button" class="tree-go" data-path="${esc(key)}">
               <span class="san">${esc(child.move)}</span>
               <span class="name">${esc(child.name)}</span>
-              <span class="n">${num(child.games)}</span>
-              <span class="pct">${rate(child, spot.games)}</span>
+              <span class="n">${icons.pawn}${num(child.games)}</span>
+              ${gauge(shownScore(child, spot.games))}
               ${bar(child, spot.games)}
+              <span class="chev">${icons.chevron}</span>
             </button>
             <button type="button" class="icon pin" data-line="${esc(line)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${on ? 'Retirer' : 'Épingler'} ${esc(child.move)}" title="${on ? 'Retirer' : 'Épingler'}">${icons.pin}</button>
           </div>`
         })
         .join('')
     : '<p class="muted">Pas de coup suivant dans cette sélection.</p>'
+  const treeHead = children.length
+    ? `<div class="tree-line head"><div class="tree-head" aria-hidden="true"><span></span><span></span><span>${icons.pawn}</span><span>${icons.meter}</span><span class="bar-slot"></span><span></span></div><span></span></div>`
+    : ''
   const pins = state.pins.length
     ? `<ul class="pin-list">${state.pins
         .map((line) => {
@@ -368,7 +387,7 @@ function dashboard(): string {
         ${state.path.length ? `<p class="position-name">${esc(state.path.join(' '))}</p>` : ''}
         <nav class="crumbs">${crumbs}</nav>
         <div class="opening-grid">
-          <div class="tree">${tree}</div>
+          <div class="tree">${treeHead}${tree}</div>
           ${boardHtml(state.path, state.flip)}
         </div>
       </section>
@@ -383,12 +402,13 @@ function dashboard(): string {
             ${icons.users}
             <input id="opp-search" value="${esc(state.oppQuery)}" />
           </label>
+          ${opponents.length ? scoreHead(2, 'opp') : ''}
           <ul class="opp-list">
             ${opponents
               .map((row) => {
                 const active = oppActive === row.name.toLowerCase()
                 const code = state.countries[row.name.toLowerCase()] || ''
-                return `<li><button type="button" class="opp" data-opp="${esc(row.name)}" aria-pressed="${active ? 'true' : 'false'}"><span class="flag-slot" data-flag="${esc(row.name)}">${flagHtml(code)}</span><span>${esc(row.name)}</span><span class="muted">${num(row.games)}</span><span>${rate(row, tally.games)}</span></button></li>`
+                return `<li><button type="button" class="opp" data-opp="${esc(row.name)}" aria-pressed="${active ? 'true' : 'false'}"><span class="flag-slot" data-flag="${esc(row.name)}">${flagHtml(code)}</span><span class="name">${esc(row.name)}</span><span class="n">${icons.pawn}${num(row.games)}</span>${gauge(shownScore(row, tally.games))}<span class="chev">${icons.chevron}</span></button></li>`
               })
               .join('') || '<li class="muted">Aucun adversaire dans cette sélection.</li>'}
           </ul>

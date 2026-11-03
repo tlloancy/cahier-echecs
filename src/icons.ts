@@ -37,4 +37,6 @@ export const icons = {
   flag: svg('<path d="M6.5 20V4"/><path class="flag-fly" d="M6.5 5.2h9.4l-1.8 2.7 1.8 2.7H6.5z" fill="#fffdf9"/>'),
   hourglass: svg('<path d="M7.5 4h9M7.5 20h9"/><path d="M8.2 4.2c0 3.5 3.8 4.3 3.8 7.8s-3.8 4.3-3.8 7.8M15.8 4.2c0 3.5-3.8 4.3-3.8 7.8s3.8 4.3 3.8 7.8"/>'),
   trend: svg('<path d="M4 6.5 10 12.5l3-3 7 7"/><path d="M14 16.5h6v-6"/>'),
+  chevron: svg('<path d="m9 6 6 6-6 6"/>'),
+  meter: svg('<rect x="3" y="10" width="18" height="4.2" rx="2"/><rect x="3" y="10" width="8" height="4.2" rx="2" fill="currentColor" stroke="none"/>'),
 }
