@@ -3,9 +3,9 @@ import { analyzeLine } from './analyze.ts'
 import { boardHtml } from './board.ts'
 import { icons } from './icons.ts'
 import { loadBook, nameAlong } from './book.ts'
-import { completeMonth, loadPlayer } from './api.ts'
+import { completeMonth, loadPlayer, loadPlayerSince } from './api.ts'
 import { countryName, fetchCountry, flagSrc } from './countries.ts'
-import { onDatabaseBlocked, readCountries, readUser, writeCountry, writeGames, writePins, writeUser } from './db.ts'
+import { mergeUser, onDatabaseBlocked, readCountries, readUser, writeCountry, writeGames, writePins, writeUser } from './db.ts'
 import { Engine } from './engine.ts'
 import {
   gamesOnLine,
@@ -389,6 +389,7 @@ function render(): void {
   const form = `<form class="load" id="load-form">
         ${identity}
         <button class="icon primary" type="submit" aria-label="${loaded ? 'Mettre à jour' : 'Charger'}" title="${loaded ? 'Mettre à jour' : 'Charger'}" ${state.phase === 'loading' ? 'disabled' : ''}>${loaded ? icons.refresh : icons.download}</button>
+        ${loaded ? `<button type="button" class="ghost" id="reload-all" ${state.phase === 'loading' ? 'disabled' : ''}>Tout retélécharger</button>` : ''}
         ${state.phase === 'loading' ? `<button class="icon stop" type="button" id="cancel" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : ''}
       </form>`
   const status = `<p id="status" class="status ${state.phase === 'error' ? 'error' : ''}" role="status">${esc(state.message)}</p>`
@@ -575,7 +576,7 @@ async function restore(user: string): Promise<void> {
   state.message = `${num(saved.games.length)} parties en mémoire.`
 }
 
-async function load(username: string): Promise<void> {
+async function load(username: string, full = false): Promise<void> {
   const trimmed = username.trim()
   if (!trimmed) return
   loadAbort?.abort()
@@ -585,31 +586,50 @@ async function load(username: string): Promise<void> {
   analysisJob += 1
   state.phase = 'loading'
   state.draft = trimmed
-  state.message = 'Lecture des archives…'
+  state.message = full ? 'Lecture des archives…' : 'Mise à jour…'
   state.analysis = null
   render()
   try {
-    const games = await loadPlayer(trimmed, state.book, {
-      signal: controller.signal,
-      onProgress: (text) => setMessage(text),
-    })
     const user = trimmed.toLowerCase()
-    const display = games[0]?.display || trimmed
+    const known = state.user === user ? state.games : ((await readUser(user))?.games ?? [])
+    const since = known.reduce((max, game) => Math.max(max, game.end), 0)
+    const incremental = !full && since > 0
+    const fresh = incremental
+      ? await loadPlayerSince(trimmed, state.book, since, {
+          signal: controller.signal,
+          onProgress: (text) => setMessage(text),
+        })
+      : await loadPlayer(trimmed, state.book, {
+          signal: controller.signal,
+          onProgress: (text) => setMessage(text),
+        })
+    const display = fresh[0]?.display || known[0]?.display || trimmed
     const previousPins = state.user === user ? state.pins : ((await readUser(user))?.pins ?? [])
-    await writeUser(user, games, display, previousPins)
+    let games: LightGame[]
+    if (incremental) {
+      const byId = new Map(known.map((game) => [game.id, game]))
+      for (const game of fresh) byId.set(game.id, game)
+      games = [...byId.values()]
+      await mergeUser(user, fresh, display, games.length)
+    } else {
+      games = fresh
+      await writeUser(user, games, display, previousPins)
+    }
     localStorage.setItem(LAST_KEY, user)
     state.user = user
     state.display = display
     state.draft = display
     state.games = games
     state.pins = previousPins
-    state.path = []
-    state.filters = { color: 'all', tc: 'all', result: 'all', ending: 'all', country: null, opp: null }
+    if (!incremental) {
+      state.path = []
+      state.filters = { color: 'all', tc: 'all', result: 'all', ending: 'all', country: null, opp: null }
+    }
     state.generation += 1
     filterCache = null
     stepCache = null
     state.phase = 'ready'
-    state.message = `${num(games.length)} parties chargées.`
+    state.message = `${num(games.length)} parties ${incremental ? 'en mémoire' : 'chargées'}.`
     await rememberCountries()
     render()
     void fillBackground()
@@ -725,6 +745,10 @@ function bind(): void {
     state.draft = field?.value || state.draft
     state.renaming = false
     void load(state.draft)
+  })
+  document.getElementById('reload-all')?.addEventListener('click', () => {
+    state.renaming = false
+    void load(state.display || state.draft, true)
   })
   document.getElementById('cancel')?.addEventListener('click', () => loadAbort?.abort())
   document.getElementById('pseudo')?.addEventListener('input', (event) => {

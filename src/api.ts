@@ -197,6 +197,50 @@ function toLight(raw: ApiGame, user: string, book: Book, index: number): LightGa
   }
 }
 
+export async function loadPlayerSince(
+  username: string,
+  book: Book,
+  sinceEnd: number,
+  hooks: { onProgress: (text: string) => void; signal: AbortSignal },
+): Promise<LightGame[]> {
+  const user = username.trim().toLowerCase()
+  const start = new Date(sinceEnd * 1000)
+  let year = start.getUTCFullYear()
+  let month = start.getUTCMonth() + 1
+  const now = new Date()
+  const endYear = now.getUTCFullYear()
+  const endMonth = now.getUTCMonth() + 1
+  const games: LightGame[] = []
+  let seen = 0
+  let step = 0
+  const total = (endYear - year) * 12 + (endMonth - month) + 1
+  while (year < endYear || (year === endYear && month <= endMonth)) {
+    if (hooks.signal.aborted) throw new DOMException('Arrêté', 'AbortError')
+    step += 1
+    const mm = String(month).padStart(2, '0')
+    hooks.onProgress(`Mise à jour · ${step} / ${total}`)
+    const url = `https://api.chess.com/pub/player/${encodeURIComponent(user)}/games/${year}/${mm}`
+    let list: ApiGame[] = []
+    try {
+      const data = await getJson<{ games?: ApiGame[] }>(url, hooks.signal)
+      list = data.games || []
+    } catch (error) {
+      if (!(error instanceof Error) || error.message !== 'Ce pseudo n’existe pas sur Chess.com.') throw error
+    }
+    for (const raw of list) {
+      seen += 1
+      const light = toLight(raw, user, book, seen)
+      if (light) games.push(light)
+    }
+    month += 1
+    if (month === 13) {
+      month = 1
+      year += 1
+    }
+  }
+  return games
+}
+
 export async function loadPlayer(
   username: string,
   book: Book,

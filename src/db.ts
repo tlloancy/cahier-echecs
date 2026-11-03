@@ -76,6 +76,16 @@ export async function writeUser(user: string, games: LightGame[], display: strin
   await database.put('pins', pins, user)
 }
 
+export async function mergeUser(user: string, games: LightGame[], display: string, count: number): Promise<void> {
+  const database = await db()
+  if (games.length) {
+    const tx = database.transaction('games', 'readwrite')
+    for (const game of games) tx.store.put(game)
+    await tx.done
+  }
+  await database.put('meta', { at: Date.now(), count, display }, user)
+}
+
 export async function writeGame(game: LightGame): Promise<void> {
   const database = await db()
   await database.put('games', game)
