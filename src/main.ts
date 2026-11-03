@@ -181,7 +181,7 @@ function moveLabel(ply: number, san: string): string {
   return ply % 2 === 1 ? `${move}. ${san}` : `${move}… ${san}`
 }
 
-function findingList(mark: string, label: string, hint: string, rows: Finding[], empty: string, kind: 'faille' | 'decisif'): string {
+function findingList(mark: string, label: string, rows: Finding[], empty: string, kind: 'faille' | 'decisif'): string {
   if (!rows.length && !empty) return ''
   const items = rows.length
     ? rows
@@ -196,7 +196,7 @@ function findingList(mark: string, label: string, hint: string, rows: Finding[],
         })
         .join('')
     : `<li class="muted">${esc(empty)}</li>`
-  return `<section class="findings"><h2 class="icon-title">${mark}<span>${esc(label)}</span></h2><p class="note">${esc(hint)}</p><ul class="finding-list">${items}</ul></section>`
+  return `<section class="findings"><h2 class="icon-title">${mark}<span class="sr">${esc(label)}</span></h2><ul class="finding-list">${items}</ul></section>`
 }
 
 function loupeSection(): string {
@@ -208,7 +208,6 @@ function loupeSection(): string {
   const failles = findingList(
     icons.alert,
     'Failles',
-    'Un coup moins bon, à n’importe quel moment de la partie.',
     analysis.failles,
     analysis.running ? '' : 'Aucune faille dans ces parties.',
     'faille',
@@ -216,14 +215,13 @@ function loupeSection(): string {
   const decisifs = findingList(
     icons.spark,
     'Coups décisifs',
-    'Tu donnes du matériel, et c’est quand même le bon coup.',
     analysis.decisifs,
     analysis.running ? '' : 'Aucun dans ces parties.',
     'decisif',
   )
   return `<section class="panel loupe" id="loupe">
       <div class="toolbar">
-        <h2 class="icon-title">${icons.search}<span>Loupe</span></h2>
+        <h2 class="icon-title">${icons.eval}<span class="sr">Loupe</span></h2>
         ${stop}
       </div>
       <p id="loupe-status" class="status ${analysis.running ? 'running' : ''}" role="status">${esc(analysis.status)}</p>
@@ -379,10 +377,9 @@ function dashboard(): string {
           <h2>${name ? esc(name) : 'Ouvertures'}</h2>
           <span class="toolbar-actions">
             ${state.path.length ? `<button type="button" class="icon pin" id="pin-here" aria-pressed="${pinnedHere ? 'true' : 'false'}" aria-label="${pinnedHere ? 'Retirer cette ligne' : 'Épingler cette ligne'}" title="${pinnedHere ? 'Retirer' : 'Épingler'}">${icons.pin}</button>` : ''}
-            ${state.path.length && !state.analysis?.running ? `<button type="button" class="icon primary" id="analyze" aria-label="Parcourir toute la partie" title="Parcourir toute la partie">${icons.search}</button>` : ''}
+            ${state.path.length && !state.analysis?.running ? `<button type="button" class="icon" id="analyze" aria-label="Parcourir toute la partie" title="Parcourir toute la partie">${icons.eval}</button>` : ''}
           </span>
         </div>
-        <p class="note">Le coup suivant dans tes parties. La loupe parcourt toute la partie, pendant que tu continues.</p>
         ${state.path.length ? `<p class="position-name">${esc(state.path.join(' '))}</p>` : ''}
         <nav class="crumbs">${crumbs}</nav>
         <div class="opening-grid">

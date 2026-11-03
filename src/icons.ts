@@ -39,4 +39,5 @@ export const icons = {
   trend: svg('<path d="M4 6.5 10 12.5l3-3 7 7"/><path d="M14 16.5h6v-6"/>'),
   chevron: svg('<path d="m9 6 6 6-6 6"/>'),
   meter: svg('<rect x="3" y="10" width="18" height="4.2" rx="2"/><rect x="3" y="10" width="8" height="4.2" rx="2" fill="currentColor" stroke="none"/>'),
+  eval: '<svg class="ico eval" viewBox="0 0 24 24" aria-hidden="true"><rect x="7.5" y="2.5" width="9" height="19" rx="1.5" fill="#f4efe6" stroke="#1c1612" stroke-width="1.5"/><rect x="9" y="12" width="6" height="8.2" fill="#1c1612"/></svg>',
 }
