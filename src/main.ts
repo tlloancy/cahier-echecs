@@ -118,6 +118,23 @@ function pathKey(path: string[]): string {
   return path.join(' ')
 }
 
+function lineSides(games: LightGame[], path: string[]): { w: number; b: number } {
+  const sides = { w: 0, b: 0 }
+  for (const game of gamesOnLine(games, path)) sides[game.color] += 1
+  return sides
+}
+
+function userSide(sides: { w: number; b: number }): 'w' | 'b' | 'mix' {
+  if (state.filters.color === 'w' || state.filters.color === 'b') return state.filters.color
+  if (sides.w > 0 && sides.b === 0) return 'w'
+  if (sides.b > 0 && sides.w === 0) return 'b'
+  return 'mix'
+}
+
+function blackAtBottom(side: 'w' | 'b' | 'mix'): boolean {
+  return state.flip ? side !== 'b' : side === 'b'
+}
+
 function keyToPath(key: string): string[] {
   return key ? key.split('|') : []
 }
@@ -263,12 +280,16 @@ function dashboard(): string {
   const query = state.oppQuery.trim().toLowerCase()
   const opponentAll = opponentRows(games).filter((row) => !query || row.name.toLowerCase().includes(query))
   const opponents = opponentAll.slice(0, 80)
+  const sides = lineSides(games, state.path)
+  const side = userSide(sides)
   const crumbs = [
     `<button type="button" class="icon" data-path="" ${named('start')} ${state.path.length === 0 ? 'aria-current="true"' : ''}>${icons.home}</button>`,
     ...state.path.map((san, index) => {
       const key = state.path.slice(0, index + 1).join('|')
       const current = index === state.path.length - 1 ? 'aria-current="true"' : ''
-      return `<button type="button" data-path="${esc(key)}" ${current}>${esc(san)}</button>`
+      const ply = index % 2 === 0 ? 'w' : 'b'
+      const mine = side !== 'mix' && side === ply ? ' mine' : ''
+      return `<button type="button" class="ply ${ply}${mine}" data-path="${esc(key)}" ${current}>${esc(san)}</button>`
     }),
   ].join('')
   const tree = children.length
@@ -371,7 +392,7 @@ function dashboard(): string {
           })
           .join('')}
       </div>
-      <button type="button" class="icon" id="flip" ${named(state.flip ? 'flipOn' : 'flipOff')}>${icons.flip}</button>
+      <button type="button" class="icon" id="flip" ${named(blackAtBottom(side) ? 'flipOn' : 'flipOff')}>${icons.flip}</button>
     </div>
     <div class="countries">
       <div class="toolbar">
@@ -393,7 +414,19 @@ function dashboard(): string {
         <nav class="crumbs">${crumbs}</nav>
         <div class="opening-grid">
           <div class="tree">${treeHead}${tree}</div>
-          ${boardHtml(state.path, state.flip)}
+          <div class="board-seat${side === 'w' || side === 'b' ? ` as-${side}` : ''}">
+            ${boardHtml(state.path, blackAtBottom(side))}
+            ${side === 'w' || side === 'b' ? '<div class="seat-band"></div>' : ''}
+            ${
+              sides.w || sides.b
+                ? `<div class="seat">${
+                    side === 'mix'
+                      ? `<span class="mini-piece w"></span><span>${num(sides.w)}</span><span class="mini-piece b"></span><span>${num(sides.b)}</span>`
+                      : `<span class="mini-piece ${side}"></span>`
+                  }</div>`
+                : ''
+            }
+          </div>
         </div>
         ${loupeSection()}
       </section>
