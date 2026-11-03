@@ -4,7 +4,9 @@ Arbre d'ouvertures, scores contre chaque joueur et lignes épinglées, à partir
 
 La page : https://tlloancy.github.io/cahier-echecs/
 
-Entre un pseudo. Le navigateur télécharge les archives, classe les douze premiers coups et garde le résultat sur cet appareil. Une ligne épinglée peut être analysée avec Stockfish, sur huit parties récentes au plus.
+![Cahier d'échecs](public/og.png)
+
+Entre un pseudo. Le navigateur télécharge les archives, classe les coups et garde le résultat sur cet appareil. Une ligne épinglée peut être analysée avec Stockfish, sur huit parties récentes au plus.
 
 Les noms d'ouvertures viennent du livre [lichess-org/chess-openings](https://github.com/lichess-org/chess-openings). Le moteur est Stockfish, sous licence GNU GPL v3.
 
