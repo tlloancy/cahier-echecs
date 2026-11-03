@@ -254,9 +254,8 @@ function dashboard(): string {
   const here = pathKey(state.path)
   const pinnedHere = state.pins.includes(here)
   const query = state.oppQuery.trim().toLowerCase()
-  const opponents = opponentRows(games)
-    .filter((row) => !query || row.name.toLowerCase().includes(query))
-    .slice(0, 80)
+  const opponentAll = opponentRows(games).filter((row) => !query || row.name.toLowerCase().includes(query))
+  const opponents = opponentAll.slice(0, 80)
   const crumbs = [
     `<button type="button" class="icon" data-path="" aria-label="Départ" title="Départ" ${state.path.length === 0 ? 'aria-current="true"' : ''}>${icons.home}</button>`,
     ...state.path.map((san, index) => {
@@ -306,7 +305,7 @@ function dashboard(): string {
           </li>`
         })
         .join('')}</ul>`
-    : '<p class="muted">Aucune ligne épinglée.</p>'
+    : `<div class="pin-empty"><span class="ghost-arrow" aria-hidden="true"></span><span class="ghost-pin">${icons.pin}</span></div>`
   const oppActive = state.filters.opp
   const base = tallyOf(selectGames(state.games, { ...state.filters, result: 'all' }, state.countries))
   const endings = { mate: 0, resign: 0, time: 0 }
@@ -394,7 +393,7 @@ function dashboard(): string {
       <div class="side">
         <section class="panel">
           <div class="toolbar">
-            <h2 class="icon-title" title="Adversaires">${icons.users}<span class="sr">Adversaires</span></h2>
+            <h2 class="icon-title" title="Adversaires">${icons.users}<span class="count-badge">${num(opponentAll.length)}</span><span class="sr">Adversaires</span></h2>
             ${oppActive ? `<button type="button" class="icon" id="clear-opp" aria-label="Tous les adversaires" title="Tous les adversaires">${icons.close}</button>` : ''}
           </div>
           <label class="search">
@@ -414,7 +413,7 @@ function dashboard(): string {
           </ul>
         </section>
         <section class="panel">
-          <h2 class="icon-title" title="Lignes épinglées">${icons.pin}<span class="sr">Lignes épinglées</span></h2>
+          <h2 class="icon-title" title="Lignes épinglées">${icons.pin}${state.pins.length ? `<span class="count-badge">${num(state.pins.length)}</span>` : ''}<span class="sr">Lignes épinglées</span></h2>
           ${pins}
         </section>
       </div>

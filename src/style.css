@@ -498,6 +498,57 @@ button.icon[aria-pressed="true"] .ico.tc-daily { color: inherit; }
 .pin[aria-pressed="true"] { color: var(--wax); }
 
 .side { display: grid; gap: 1rem; }
+.side .icon-title .ico { width: 20px; height: 20px; }
+.count-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.35rem;
+  border-radius: 99px;
+  background: var(--ink);
+  color: #f6f0e6;
+  font-size: 0.75rem;
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.pin-empty {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-height: 3.2rem;
+}
+.ghost-pin {
+  display: grid;
+  place-items: center;
+  width: 2.45rem;
+  height: 2.45rem;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+  opacity: 0.55;
+}
+.ghost-pin .ico { width: 1.15rem; height: 1.15rem; }
+.ghost-arrow {
+  width: 2.6rem;
+  height: 0.7rem;
+  background: var(--muted);
+  clip-path: polygon(0 35%, 22% 0, 22% 28%, 100% 28%, 100% 72%, 22% 72%, 22% 100%);
+  animation: point-left 1s ease-in-out infinite;
+}
+@keyframes point-left {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-8px); }
+}
+@media (max-width: 1099px) {
+  .pin-empty { flex-direction: column; align-items: flex-start; }
+  .ghost-arrow { animation-name: point-up; }
+}
+@keyframes point-up {
+  0%, 100% { transform: rotate(-90deg) translateX(0); }
+  50% { transform: rotate(-90deg) translateX(-8px); }
+}
 .opp-list, .pin-list, .finding-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.25rem; }
 .country-strip {
   display: flex;
