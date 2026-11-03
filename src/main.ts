@@ -7,6 +7,7 @@ import { completeMonth, loadPlayer, loadPlayerSince, releaseMonths } from './api
 import { countryName, fetchCountry, flagSrc } from './countries.ts'
 import { mergeUser, onDatabaseBlocked, readCountries, readUser, unsaved, writeCountry, writeGames, writePins, writeUser } from './db.ts'
 import { Engine } from './engine.ts'
+import { labels, type LabelKey } from './labels.ts'
 import {
   gamesOnLine,
   losingOpenings,
@@ -79,6 +80,11 @@ let analysisAbort: AbortController | null = null
 let engine: Engine | null = null
 const app = document.querySelector('#app') as HTMLElement
 
+function named(key: LabelKey, more = ''): string {
+  const text = more ? `${labels[key]} ${more}` : labels[key]
+  return `aria-label="${esc(text)}" data-tip="${key}"${more ? ` data-tip-more="${esc(more)}"` : ''}`
+}
+
 function esc(value: string): string {
   return value.replace(/[&<>"']/g, (char) => {
     switch (char) {
@@ -103,7 +109,7 @@ function num(value: number): string {
 function flagHtml(code: string): string {
   if (!/^[A-Z]{2}$/.test(code)) return ''
   const name = countryName(code)
-  return `<img class="flag" src="${esc(flagSrc(code, import.meta.env.BASE_URL))}" width="18" height="14" alt="${esc(name)}" title="${esc(name)}">`
+  return `<img class="flag" src="${esc(flagSrc(code, import.meta.env.BASE_URL))}" width="18" height="14" alt="" data-tip-text="${esc(name)}">`
 }
 
 function pathKey(path: string[]): string {
@@ -189,7 +195,7 @@ function findingList(mark: string, label: string, rows: Finding[], empty: string
         .map((row) => {
           const href = playableUrl(row.url)
           const link = href
-            ? `<a class="icon-link" href="${esc(href)}" target="_blank" rel="noreferrer" aria-label="Partie contre ${esc(row.opp)}" title="Partie contre ${esc(row.opp)}">${icons.link}</a>`
+            ? `<a class="icon-link" href="${esc(href)}" target="_blank" rel="noreferrer" ${named('game', row.opp)}>${icons.link}</a>`
             : ''
           const detail = kind === 'faille' ? `${moveLabel(row.ply, row.san)} → ${row.best}` : moveLabel(row.ply, row.san)
           const loss = kind === 'faille' ? `<span class="loss">−${num(row.cpl)}</span>` : ''
@@ -204,7 +210,7 @@ function loupeSection(): string {
   const analysis = state.analysis
   if (!analysis) return ''
   const stop = analysis.running
-    ? `<button type="button" class="icon stop" id="stop-analysis" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>`
+    ? `<button type="button" class="icon stop" id="stop-analysis" ${named('stop')}>${icons.stop}</button>`
     : ''
   const failles = findingList(
     icons.alert,
@@ -243,7 +249,7 @@ function lossSection(): string {
         .join('')}</ul>`
     : '<p class="muted">Pas encore dix parties dans une ouverture.</p>'
   const pip = rows.length ? `<span class="pip">${rows.length}</span>` : '<span class="pip dot"></span>'
-  return `<section class="panel losses"><h2 class="icon-title">${icons.trend}${pip}<span class="sr">Où je perds des points</span></h2>${list}</section>`
+  return `<section class="panel losses"><h2 class="icon-title" ${named('weak')}>${icons.trend}${pip}<span class="sr">${labels.weak}</span></h2>${list}</section>`
 }
 
 function dashboard(): string {
@@ -256,7 +262,7 @@ function dashboard(): string {
   const opponentAll = opponentRows(games).filter((row) => !query || row.name.toLowerCase().includes(query))
   const opponents = opponentAll.slice(0, 80)
   const crumbs = [
-    `<button type="button" class="icon" data-path="" aria-label="Départ" title="Départ" ${state.path.length === 0 ? 'aria-current="true"' : ''}>${icons.home}</button>`,
+    `<button type="button" class="icon" data-path="" ${named('start')} ${state.path.length === 0 ? 'aria-current="true"' : ''}>${icons.home}</button>`,
     ...state.path.map((san, index) => {
       const key = state.path.slice(0, index + 1).join('|')
       const current = index === state.path.length - 1 ? 'aria-current="true"' : ''
@@ -279,7 +285,7 @@ function dashboard(): string {
               ${bar(child, spot.games)}
               <span class="chev">${icons.chevron}</span>
             </button>
-            <button type="button" class="icon pin" data-line="${esc(line)}" aria-pressed="${on ? 'true' : 'false'}" aria-label="${on ? 'Retirer' : 'Épingler'} ${esc(child.move)}" title="${on ? 'Retirer' : 'Épingler'}">${icons.pin}</button>
+            <button type="button" class="icon pin" data-line="${esc(line)}" aria-pressed="${on ? 'true' : 'false'}" ${named(on ? 'unpin' : 'pin', child.move)}>${icons.pin}</button>
           </div>`
         })
         .join('')
@@ -300,7 +306,7 @@ function dashboard(): string {
               ${moves}
             </button>
             <span class="muted">${num(row.games)} · ${rate(row, tally.games)}</span>
-            <button type="button" class="icon" data-drop="${esc(line)}" aria-label="Retirer" title="Retirer">${icons.close}</button>
+            <button type="button" class="icon" data-drop="${esc(line)}" ${named('unpin')}>${icons.close}</button>
           </li>`
         })
         .join('')}</ul>`
@@ -311,17 +317,18 @@ function dashboard(): string {
   for (const game of selectGames(state.games, { ...state.filters, ending: 'all' }, state.countries)) {
     if (game.how === 'mate' || game.how === 'resign' || game.how === 'time') endings[game.how] += 1
   }
-  const resultCards: Array<['w' | 'd' | 'l', number, string, string]> = [
-    ['w', base.w, '✓', 'Victoires'],
-    ['d', base.d, '½', 'Nulles'],
-    ['l', base.l, '✗', 'Défaites'],
+  const resultCards: Array<['w' | 'd' | 'l', number, string]> = [
+    ['w', base.w, '✓'],
+    ['d', base.d, '½'],
+    ['l', base.l, '✗'],
   ]
   return `<section class="summary" role="group" aria-label="Résultat">
-      <div class="stat total"><span class="mark">${icons.pawn}</span><strong>${num(base.games)}</strong></div>
+      <div class="stat total" ${named('games')}><span class="mark">${icons.pawn}</span><strong>${num(base.games)}</strong></div>
       ${resultCards
-        .map(([value, count, glyph, label]) => {
+        .map(([value, count, glyph]) => {
           const pressed = state.filters.result === value
-          return `<button type="button" class="stat result ${value}" data-result="${value}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${label}" title="${label}"><span class="mark">${glyph}</span><strong>${num(count)}</strong></button>`
+          const key = value === 'w' ? 'wins' : value === 'd' ? 'draws' : 'losses'
+          return `<button type="button" class="stat result ${value}" data-result="${value}" aria-pressed="${pressed ? 'true' : 'false'}" ${named(key)}><span class="mark">${glyph}</span><strong>${num(count)}</strong></button>`
         })
         .join('')}
     </section>
@@ -329,45 +336,45 @@ function dashboard(): string {
       <div class="seg" role="group" aria-label="Couleur">
         ${(['all', 'w', 'b'] as const)
           .map((value) => {
-            const label = value === 'all' ? 'Les deux couleurs' : value === 'w' ? 'Blancs' : 'Noirs'
+            const key = value === 'all' ? 'both' : value === 'w' ? 'white' : 'black'
             const mark = value === 'all' ? icons.both : value === 'w' ? '<span class="mini-piece w"></span>' : '<span class="mini-piece b"></span>'
-            return `<button type="button" class="icon" data-color="${value}" aria-pressed="${state.filters.color === value ? 'true' : 'false'}" aria-label="${label}" title="${label}">${mark}</button>`
+            return `<button type="button" class="icon" data-color="${value}" aria-pressed="${state.filters.color === value ? 'true' : 'false'}" ${named(key)}>${mark}</button>`
           })
           .join('')}
       </div>
       <div class="seg" role="group" aria-label="Cadence">
         ${([
-          ['all', icons.rows, 'Toutes les cadences'],
-          ['bullet', icons.bullet, 'Bullet'],
-          ['blitz', icons.blitz, 'Blitz'],
-          ['rapid', icons.rapid, 'Rapide'],
-          ['daily', icons.daily, 'Quotidien'],
+          ['all', icons.rows, 'allTc'],
+          ['bullet', icons.bullet, 'bullet'],
+          ['blitz', icons.blitz, 'blitz'],
+          ['rapid', icons.rapid, 'rapid'],
+          ['daily', icons.daily, 'daily'],
         ] as const)
           .map(
-            ([value, mark, label]) =>
-              `<button type="button" class="icon" data-tc="${value}" aria-pressed="${state.filters.tc === value ? 'true' : 'false'}" aria-label="${label}" title="${label}">${mark}</button>`,
+            ([value, mark, key]) =>
+              `<button type="button" class="icon" data-tc="${value}" aria-pressed="${state.filters.tc === value ? 'true' : 'false'}" ${named(key)}>${mark}</button>`,
           )
           .join('')}
       </div>
       <div class="seg words" role="group" aria-label="Fin de partie">
         ${([
-          ['mate', '#', 'Échec et mat'],
-          ['resign', icons.flag, 'Abandon'],
-          ['time', icons.hourglass, 'Temps'],
+          ['mate', '#', 'mate'],
+          ['resign', icons.flag, 'resign'],
+          ['time', icons.hourglass, 'time'],
         ] as const)
-          .map(([value, glyph, label]) => {
+          .map(([value, glyph, key]) => {
             const pressed = state.filters.ending === value
-            return `<button type="button" data-ending="${value}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${label}" title="${label}"><span class="glyph">${glyph}</span><span>${num(endings[value])}</span></button>`
+            return `<button type="button" data-ending="${value}" aria-pressed="${pressed ? 'true' : 'false'}" ${named(key)}><span class="glyph">${glyph}</span><span>${num(endings[value])}</span></button>`
           })
           .join('')}
       </div>
-      <button type="button" class="icon" id="flip" aria-label="${state.flip ? 'Côté blancs' : 'Retourner l’échiquier'}" title="${state.flip ? 'Côté blancs' : 'Retourner'}">${icons.flip}</button>
+      <button type="button" class="icon" id="flip" ${named(state.flip ? 'flipOn' : 'flipOff')}>${icons.flip}</button>
     </div>
     ${loupeSection()}
     <section class="panel countries">
       <div class="toolbar">
-        <h2 class="icon-title" title="Pays">${icons.globe}<span class="sr">Pays</span></h2>
-        ${state.filters.country ? `<button type="button" class="icon" id="clear-country" aria-label="Tous les pays" title="Tous les pays">${icons.close}</button>` : ''}
+        <h2 class="icon-title" ${named('country')}>${icons.globe}<span class="sr">${labels.country}</span></h2>
+        ${state.filters.country ? `<button type="button" class="icon" id="clear-country" ${named('allCountries')}>${icons.close}</button>` : ''}
       </div>
       <div class="country-strip" id="country-strip" role="group" aria-label="Pays">${countryButtons()}</div>
     </section>
@@ -377,8 +384,8 @@ function dashboard(): string {
         <div class="toolbar">
           <h2>${name ? esc(name) : 'Ouvertures'}</h2>
           <span class="toolbar-actions">
-            ${state.path.length ? `<button type="button" class="icon pin" id="pin-here" aria-pressed="${pinnedHere ? 'true' : 'false'}" aria-label="${pinnedHere ? 'Retirer cette ligne' : 'Épingler cette ligne'}" title="${pinnedHere ? 'Retirer' : 'Épingler'}">${icons.pin}</button>` : ''}
-            ${state.path.length && !state.analysis?.running ? `<button type="button" class="icon" id="analyze" aria-label="Parcourir toute la partie" title="Parcourir toute la partie">${icons.eval}</button>` : ''}
+            ${state.path.length ? `<button type="button" class="icon pin" id="pin-here" aria-pressed="${pinnedHere ? 'true' : 'false'}" ${named(pinnedHere ? 'unpinLine' : 'pinLine')}>${icons.pin}</button>` : ''}
+            ${state.path.length && !state.analysis?.running ? `<button type="button" class="icon" id="analyze" ${named('analyze')}>${icons.eval}</button>` : ''}
           </span>
         </div>
         ${state.path.length ? `<p class="position-name">${esc(state.path.join(' '))}</p>` : ''}
@@ -391,11 +398,11 @@ function dashboard(): string {
       <div class="side">
         <section class="panel">
           <div class="toolbar">
-            <h2 class="icon-title" title="Adversaires">${icons.users}<span class="count-badge">${num(opponentAll.length)}</span><span class="sr">Adversaires</span></h2>
-            ${oppActive ? `<button type="button" class="icon" id="clear-opp" aria-label="Tous les adversaires" title="Tous les adversaires">${icons.close}</button>` : ''}
+            <h2 class="icon-title" ${named('opponents')}>${icons.users}<span class="count-badge">${num(opponentAll.length)}</span><span class="sr">${labels.opponents}</span></h2>
+            ${oppActive ? `<button type="button" class="icon" id="clear-opp" ${named('allOpponents')}>${icons.close}</button>` : ''}
           </div>
           <label class="search">
-            <span class="sr">Adversaire</span>
+            <span class="sr">${labels.opponent}</span>
             ${icons.users}
             <input id="opp-search" value="${esc(state.oppQuery)}" />
           </label>
@@ -411,7 +418,7 @@ function dashboard(): string {
           </ul>
         </section>
         <section class="panel">
-          <h2 class="icon-title" title="Lignes épinglées">${icons.pin}${state.pins.length ? `<span class="count-badge">${num(state.pins.length)}</span>` : ''}<span class="sr">Lignes épinglées</span></h2>
+          <h2 class="icon-title" ${named('pins')}>${icons.pin}${state.pins.length ? `<span class="count-badge">${num(state.pins.length)}</span>` : ''}<span class="sr">${labels.pins}</span></h2>
           ${pins}
         </section>
       </div>
@@ -427,15 +434,16 @@ function homePreview(): string {
           <div class="mock-board"></div>
         </div>
       </div>
-      <button type="button" class="icon primary play" id="demo" aria-label="Exemple" title="Exemple">${icons.play}</button>
+      <button type="button" class="icon primary play" id="demo" ${named('demo')}>${icons.play}</button>
     </div>`
 }
 
 function render(): void {
+  hideTip()
   const focus = document.activeElement instanceof HTMLElement ? document.activeElement.id : ''
   const caret = document.activeElement instanceof HTMLInputElement ? document.activeElement.selectionStart : null
   const loaded = state.games.length > 0
-  const field = `<label><span class="sr">Pseudo Chess.com</span>
+  const field = `<label><span class="sr">${labels.user}</span>
           <input id="pseudo" name="pseudo" autocomplete="username" required value="${esc(state.draft)}" />
         </label>`
   const identity = loaded && !state.renaming
@@ -443,8 +451,8 @@ function render(): void {
     : field
   const form = `<form class="load" id="load-form">
         ${identity}
-        <button class="icon primary" type="submit" aria-label="${loaded ? 'Mettre à jour' : 'Charger'}" title="${loaded ? 'Mettre à jour' : 'Charger'}" ${state.phase === 'loading' ? 'disabled' : ''}>${loaded ? icons.refresh : icons.arrow}</button>
-        ${state.phase === 'loading' ? `<button class="icon stop" type="button" id="cancel" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : ''}
+        <button class="icon primary" type="submit" ${named(loaded ? 'update' : 'load')} ${state.phase === 'loading' ? 'disabled' : ''}>${loaded ? icons.refresh : icons.arrow}</button>
+        ${state.phase === 'loading' ? `<button class="icon stop" type="button" id="cancel" ${named('stop')}>${icons.stop}</button>` : ''}
       </form>`
   const ratio = state.progress == null ? 0 : Math.round(state.progress * 100)
   const bar =
@@ -537,7 +545,7 @@ function countryButtons(): string {
     .map((row) => {
       const name = countryName(row.code)
       const pressed = state.filters.country === row.code
-      return `<button type="button" class="country" data-country="${esc(row.code)}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${esc(name)}" title="${esc(name)}">${flagHtml(row.code)}<span>${num(row.games)}</span></button>`
+      return `<button type="button" class="country" data-country="${esc(row.code)}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${esc(name)}" data-tip-text="${esc(name)}">${flagHtml(row.code)}<span>${num(row.games)}</span></button>`
     })
     .join('')
 }
@@ -844,6 +852,85 @@ async function startAnalysis(): Promise<void> {
   }
 }
 
+let tipNode: HTMLElement | null = null
+let tipTimer = 0
+let hideTimer = 0
+let suppressClick = false
+
+function hideTip(): void {
+  window.clearTimeout(hideTimer)
+  tipNode?.remove()
+  tipNode = null
+}
+
+function tipText(el: HTMLElement): string {
+  if (el.dataset.tipText) return el.dataset.tipText
+  const key = el.dataset.tip as LabelKey | undefined
+  if (!key || !(key in labels)) return ''
+  const more = el.dataset.tipMore || ''
+  return more ? `${labels[key]} ${more}` : labels[key]
+}
+
+function showTip(anchor: HTMLElement): void {
+  const text = tipText(anchor)
+  if (!text) return
+  hideTip()
+  const bubble = document.createElement('div')
+  bubble.className = 'tip'
+  bubble.setAttribute('role', 'tooltip')
+  bubble.textContent = text
+  document.body.appendChild(bubble)
+  const rect = anchor.getBoundingClientRect()
+  const below = rect.top < 48
+  bubble.style.left = `${Math.min(window.innerWidth - 12, Math.max(12, rect.left + rect.width / 2))}px`
+  bubble.style.top = `${below ? rect.bottom : rect.top}px`
+  bubble.classList.toggle('below', below)
+  tipNode = bubble
+}
+
+function bindTips(): void {
+  for (const el of app.querySelectorAll<HTMLElement>('[data-tip], [data-tip-text]')) {
+    el.addEventListener('pointerenter', (event) => {
+      if (event.pointerType !== 'mouse') return
+      showTip(el)
+    })
+    el.addEventListener('pointerleave', (event) => {
+      if (event.pointerType !== 'mouse') return
+      hideTip()
+    })
+    el.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'mouse') return
+      window.clearTimeout(tipTimer)
+      suppressClick = false
+      tipTimer = window.setTimeout(() => {
+        showTip(el)
+        suppressClick = true
+      }, 450)
+    })
+    el.addEventListener('pointerup', (event) => {
+      if (event.pointerType === 'mouse') return
+      window.clearTimeout(tipTimer)
+      if (suppressClick) {
+        hideTimer = window.setTimeout(hideTip, 900)
+        return
+      }
+      showTip(el)
+      hideTimer = window.setTimeout(hideTip, 1200)
+    })
+    el.addEventListener('pointercancel', () => window.clearTimeout(tipTimer))
+    el.addEventListener(
+      'click',
+      (event) => {
+        if (!suppressClick) return
+        event.preventDefault()
+        event.stopPropagation()
+        suppressClick = false
+      },
+      true,
+    )
+  }
+}
+
 function bind(): void {
   document.getElementById('who')?.addEventListener('click', () => {
     state.renaming = true
@@ -927,6 +1014,7 @@ function bind(): void {
   for (const button of app.querySelectorAll<HTMLButtonElement>('[data-drop]')) {
     button.addEventListener('click', () => togglePin(button.dataset.drop || ''))
   }
+  bindTips()
   for (const button of app.querySelectorAll<HTMLButtonElement>('[data-opp]')) {
     button.addEventListener('pointerenter', () => {
       void ensureCountry(button.dataset.opp || '')
