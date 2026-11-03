@@ -12,7 +12,6 @@ import {
   losingOpenings,
   nextRows,
   opponentRows,
-  scorePercent,
   selectGames,
   tallyOf,
   winPercent,
@@ -229,7 +228,8 @@ function lossSection(): string {
         )
         .join('')}</ul>`
     : '<p class="muted">Pas encore dix parties dans une ouverture.</p>'
-  return `<section class="panel losses"><h2>Où je perds des points</h2>${list}</section>`
+  const pip = rows.length ? `<span class="pip">${rows.length}</span>` : '<span class="pip dot"></span>'
+  return `<section class="panel losses"><h2 class="icon-title">${icons.trend}${pip}<span class="sr">Où je perds des points</span></h2>${list}</section>`
 }
 
 function dashboard(): string {
@@ -295,17 +295,16 @@ function dashboard(): string {
     if (game.how === 'mate' || game.how === 'resign' || game.how === 'time') endings[game.how] += 1
   }
   const resultCards: Array<[Filters['result'], number, string, string]> = [
-    ['all', base.games, base.games === 1 ? 'partie' : 'parties', `${scorePercent(base)} % de score`],
-    ['w', base.w, base.w === 1 ? 'victoire' : 'victoires', `${winPercent(base)} % de victoires`],
-    ['d', base.d, base.d === 1 ? 'nulle' : 'nulles', 'Nulles'],
-    ['l', base.l, base.l === 1 ? 'défaite' : 'défaites', 'Défaites'],
+    ['all', base.games, icons.pawn, 'Parties'],
+    ['w', base.w, '✓', 'Victoires'],
+    ['d', base.d, '½', 'Nulles'],
+    ['l', base.l, '✗', 'Défaites'],
   ]
   return `<section class="summary" role="group" aria-label="Résultat">
       ${resultCards
-        .map(([value, count, label, title]) => {
+        .map(([value, count, glyph, label]) => {
           const pressed = state.filters.result === value
-          const loss = value === 'l' ? ' loss' : ''
-          return `<button type="button" class="stat${loss}" data-result="${value}" aria-pressed="${pressed ? 'true' : 'false'}" title="${esc(title)}"><strong>${num(count)}</strong><span>${label}</span></button>`
+          return `<button type="button" class="stat ${value}" data-result="${value}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${label}" title="${label}"><span class="mark">${glyph}</span><strong>${num(count)}</strong></button>`
         })
         .join('')}
     </section>
@@ -335,13 +334,13 @@ function dashboard(): string {
       </div>
       <div class="seg words" role="group" aria-label="Fin de partie">
         ${([
-          ['mate', 'Mat', 'Échec et mat'],
-          ['resign', 'Abandon', 'Abandon'],
-          ['time', 'Temps', 'Temps'],
+          ['mate', '#', 'Échec et mat'],
+          ['resign', icons.flag, 'Abandon'],
+          ['time', icons.hourglass, 'Temps'],
         ] as const)
-          .map(([value, label, title]) => {
+          .map(([value, glyph, label]) => {
             const pressed = state.filters.ending === value
-            return `<button type="button" data-ending="${value}" aria-pressed="${pressed ? 'true' : 'false'}" title="${title}">${label} <span>${num(endings[value])}</span></button>`
+            return `<button type="button" data-ending="${value}" aria-pressed="${pressed ? 'true' : 'false'}" aria-label="${label}" title="${label}"><span class="glyph">${glyph}</span><span>${num(endings[value])}</span></button>`
           })
           .join('')}
       </div>
@@ -350,7 +349,7 @@ function dashboard(): string {
     ${loupeSection()}
     <section class="panel countries">
       <div class="toolbar">
-        <h2 title="Pays">Pays</h2>
+        <h2 class="icon-title" title="Pays">${icons.globe}<span class="sr">Pays</span></h2>
         ${state.filters.country ? `<button type="button" class="icon" id="clear-country" aria-label="Tous les pays" title="Tous les pays">${icons.close}</button>` : ''}
       </div>
       <div class="country-strip" id="country-strip" role="group" aria-label="Pays">${countryButtons()}</div>
@@ -380,9 +379,9 @@ function dashboard(): string {
             ${oppActive ? `<button type="button" class="icon" id="clear-opp" aria-label="Tous les adversaires" title="Tous les adversaires">${icons.close}</button>` : ''}
           </div>
           <label class="search">
-            <span class="sr">Recherche</span>
-            ${icons.search}
-            <input id="opp-search" value="${esc(state.oppQuery)}" placeholder="Adversaire" />
+            <span class="sr">Adversaire</span>
+            ${icons.users}
+            <input id="opp-search" value="${esc(state.oppQuery)}" />
           </label>
           <ul class="opp-list">
             ${opponents

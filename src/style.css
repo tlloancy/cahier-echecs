@@ -183,9 +183,9 @@ button:disabled { opacity: 0.55; cursor: default; }
 }
 
 .stat {
-  display: grid;
-  gap: 0.12rem;
-  align-content: center;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
   text-align: left;
   min-height: 4.4rem;
   padding: 0.7rem 0.85rem;
@@ -194,6 +194,20 @@ button:disabled { opacity: 0.55; cursor: default; }
   border-radius: 12px;
 }
 
+.stat .mark {
+  display: grid;
+  place-items: center;
+  min-width: 1.3rem;
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stat .mark .ico { width: 1.25rem; height: 1.25rem; }
+.stat.w .mark { color: var(--win); }
+.stat.d .mark { color: var(--draw); }
+.stat.l .mark { color: var(--loss); }
+
 .stat strong {
   font-size: 1.45rem;
   font-variant-numeric: tabular-nums;
@@ -201,21 +215,14 @@ button:disabled { opacity: 0.55; cursor: default; }
   line-height: 1.1;
 }
 
-.stat span { color: var(--muted); font-size: 0.85rem; }
-.stat.loss strong { color: var(--loss); }
 .stat:hover { border-color: var(--ink); }
 .stat[aria-pressed="true"] {
   background: var(--ink);
   color: #f6f0e6;
   border-color: var(--ink);
 }
-.stat[aria-pressed="true"] strong,
-.stat[aria-pressed="true"] span { color: inherit; }
-.stat.loss[aria-pressed="true"] {
-  background: var(--loss);
-  border-color: var(--loss);
-  color: #fff7f5;
-}
+.stat[aria-pressed="true"] .mark,
+.stat[aria-pressed="true"] strong { color: inherit; }
 
 .filters {
   display: flex;
@@ -306,9 +313,36 @@ button.icon.pin[aria-pressed="true"] { color: var(--wax); background: #fff6f2; b
   border: 1px solid var(--line);
   background: #fffdf9;
 }
+.seg.words button .glyph {
+  display: grid;
+  place-items: center;
+  min-width: 1rem;
+  color: var(--ink);
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.seg.words button .glyph .ico { width: 1.15rem; height: 1.15rem; }
 .seg.words button span { color: var(--muted); font-variant-numeric: tabular-nums; }
 .seg.words button[aria-pressed="true"] { background: var(--ink); color: #f6f0e6; border-color: var(--ink); }
+.seg.words button[aria-pressed="true"] .glyph,
 .seg.words button[aria-pressed="true"] span { color: inherit; }
+.seg.words button[aria-pressed="true"] .flag-fly { fill: transparent; }
+
+.pip {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.15rem;
+  height: 1.15rem;
+  padding: 0 0.32rem;
+  border-radius: 99px;
+  background: var(--loss);
+  color: #fff7f5;
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+.pip.dot { min-width: 0.55rem; width: 0.55rem; height: 0.55rem; padding: 0; }
 .mini-piece {
   width: 0.85rem;
   height: 0.85rem;

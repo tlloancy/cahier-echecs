@@ -21,4 +21,11 @@ export const icons = {
   link: svg('<path d="M14 6h4v4"/><path d="M10 14 18 6"/><path d="M10 6H6v12h12v-4"/>'),
   both: svg('<circle cx="12" cy="12" r="7"/><path d="M12 5a7 7 0 0 0 0 14z" fill="currentColor" stroke="none"/>'),
   rows: svg('<path d="M5 7h14M5 12h14M5 17h14"/>'),
+  pawn: svg(
+    '<circle cx="12" cy="7.5" r="2.35" fill="currentColor" stroke="none"/><path d="M9.1 18.6c.8-3.4 1.6-5 2.9-5s2.1 1.6 2.9 5z" fill="currentColor" stroke="none"/><path d="M7.4 18.7h9.2" fill="none"/>',
+  ),
+  globe: svg('<circle cx="12" cy="12" r="8"/><path d="M4 12h16"/><path d="M12 4c2.4 2.2 3.6 5 3.6 8s-1.2 5.8-3.6 8c-2.4-2.2-3.6-5-3.6-8s1.2-5.8 3.6-8z"/>'),
+  flag: svg('<path d="M6.5 20V4"/><path class="flag-fly" d="M6.5 5.2h9.4l-1.8 2.7 1.8 2.7H6.5z" fill="#fffdf9"/>'),
+  hourglass: svg('<path d="M7.5 4h9M7.5 20h9"/><path d="M8.2 4.2c0 3.5 3.8 4.3 3.8 7.8s-3.8 4.3-3.8 7.8M15.8 4.2c0 3.5-3.8 4.3-3.8 7.8s3.8 4.3 3.8 7.8"/>'),
+  trend: svg('<path d="M4 6.5 10 12.5l3-3 7 7"/><path d="M14 16.5h6v-6"/>'),
 }
