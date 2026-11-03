@@ -50,6 +50,7 @@ const state: {
   generation: number
   renaming: boolean
   progress: number | null
+  countriesOpen: boolean
 } = {
   draft: '',
   user: '',
@@ -68,6 +69,7 @@ const state: {
   generation: 0,
   renaming: false,
   progress: null,
+  countriesOpen: false,
 }
 
 let filterCache: { key: string; games: LightGame[] } | null = null
@@ -332,6 +334,7 @@ function dashboard(): string {
         })
         .join('')}
     </section>
+    ${lossSection()}
     <div class="filters">
       <div class="seg" role="group" aria-label="Couleur">
         ${(['all', 'w', 'b'] as const)
@@ -370,15 +373,13 @@ function dashboard(): string {
       </div>
       <button type="button" class="icon" id="flip" ${named(state.flip ? 'flipOn' : 'flipOff')}>${icons.flip}</button>
     </div>
-    ${loupeSection()}
-    <section class="panel countries">
+    <div class="countries">
       <div class="toolbar">
-        <h2 class="icon-title" ${named('country')}>${icons.globe}<span class="sr">${labels.country}</span></h2>
+        <button type="button" class="disclosure" id="countries-toggle" aria-expanded="${state.countriesOpen ? 'true' : 'false'}" ${named('country')}>${icons.globe}<span class="count-badge">${num(countryRows().length)}</span>${state.filters.country ? flagHtml(state.filters.country) : ''}<span class="twist">${icons.chevron}</span></button>
         ${state.filters.country ? `<button type="button" class="icon" id="clear-country" ${named('allCountries')}>${icons.close}</button>` : ''}
       </div>
-      <div class="country-strip" id="country-strip" role="group" aria-label="Pays">${countryButtons()}</div>
-    </section>
-    ${lossSection()}
+      ${state.countriesOpen ? `<div class="country-strip" id="country-strip" role="group" aria-label="${labels.country}">${countryButtons()}</div>` : ''}
+    </div>
     <div class="layout">
       <section class="panel">
         <div class="toolbar">
@@ -394,6 +395,7 @@ function dashboard(): string {
           <div class="tree">${treeHead}${tree}</div>
           ${boardHtml(state.path, state.flip)}
         </div>
+        ${loupeSection()}
       </section>
       <div class="side">
         <section class="panel">
@@ -989,6 +991,10 @@ function bind(): void {
     void startAnalysis()
   })
   bindLoupe()
+  document.getElementById('countries-toggle')?.addEventListener('click', () => {
+    state.countriesOpen = !state.countriesOpen
+    render()
+  })
   document.getElementById('clear-country')?.addEventListener('click', () => {
     state.filters.country = null
     render()
