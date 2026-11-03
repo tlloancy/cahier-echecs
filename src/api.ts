@@ -1,45 +1,5 @@
-import { parsePgn, startingPosition } from 'chessops/pgn'
-import { makeSanAndPlay, parseSan } from 'chessops/san'
-import { epd, MAX_PLIES } from './book.ts'
-import type { Book, Ending, GameResult, LightGame, Side, TimeClass } from './types.ts'
-
-interface ApiPlayer {
-  username?: string
-  rating?: number
-  result?: string
-}
-
-interface ApiGame {
-  url?: string
-  pgn?: string
-  time_class?: string
-  end_time?: number
-  rules?: string
-  white?: ApiPlayer
-  black?: ApiPlayer
-}
-
-const DRAWS = new Set(['agreed', 'repetition', 'stalemate', 'insufficient', '50move', 'timevsinsufficient'])
-
-function resultOf(code: string | undefined): GameResult | null {
-  if (!code) return null
-  if (code === 'win') return 'w'
-  if (DRAWS.has(code)) return 'd'
-  return 'l'
-}
-
-function endingOf(mine: string | undefined, theirs: string | undefined): Ending {
-  const code = mine === 'win' ? theirs : mine
-  if (code === 'checkmated') return 'mate'
-  if (code === 'resigned' || code === 'abandoned') return 'resign'
-  if (code === 'timeout') return 'time'
-  return 'other'
-}
-
-function timeClassOf(value: string | undefined): TimeClass {
-  if (value === 'bullet' || value === 'blitz' || value === 'rapid' || value === 'daily') return value
-  return 'other'
-}
+import type { Book, LightGame } from './types.ts'
+import { readLine, type ApiGame } from './lighten.ts'
 
 let tail: Promise<unknown> = Promise.resolve()
 
@@ -74,29 +34,11 @@ async function readJson<T>(url: string, signal: AbortSignal): Promise<T> {
   throw new Error(last || 'Chess.com limite le rythme. Réessaie dans un instant.')
 }
 
-function readLine(pgn: string, book: Book): { line: string; moves: string; opening: string } | null {
-  const game = parsePgn(pgn)[0]
-  if (!game) return null
-  const setup = startingPosition(game.headers)
-  if (setup.isErr) return null
-  const pos = setup.unwrap()
-  if (pos.rules !== 'chess') return null
-  const sans: string[] = []
-  let opening = ''
-  for (const node of game.moves.mainline()) {
-    const move = parseSan(pos, node.san)
-    if (!move) break
-    sans.push(makeSanAndPlay(pos, move))
-    if (sans.length <= MAX_PLIES) {
-      const hit = book[epd(pos)]
-      if (hit) opening = hit.name
-    }
-  }
-  if (sans.length === 0) return null
-  return { line: sans.slice(0, MAX_PLIES).join(' '), moves: sans.join(' '), opening: opening || 'Autre' }
-}
-
 const monthGames = new Map<string, ApiGame[]>()
+
+export function releaseMonths(): void {
+  monthGames.clear()
+}
 
 export async function completeMonth(
   user: string,
@@ -127,6 +69,7 @@ export async function completeMonth(
     game.moves = played?.moves || game.line
     updated.push(game)
   }
+  monthGames.delete(key)
   return updated
 }
 
@@ -153,55 +96,74 @@ export async function ensureMoves(game: LightGame, book: Book, signal: AbortSign
   return game.moves
 }
 
-function toLight(raw: ApiGame, user: string, book: Book, index: number): LightGame | null {
-  if (raw.rules && raw.rules !== 'chess') return null
-  const white = raw.white?.username || ''
-  const black = raw.black?.username || ''
-  const whiteKey = white.toLowerCase()
-  const blackKey = black.toLowerCase()
-  let color: Side
-  let result: GameResult | null
-  let how: Ending
-  let opp: string
-  if (whiteKey === user) {
-    color = 'w'
-    result = resultOf(raw.white?.result)
-    how = endingOf(raw.white?.result, raw.black?.result)
-    opp = black
-  } else if (blackKey === user) {
-    color = 'b'
-    result = resultOf(raw.black?.result)
-    how = endingOf(raw.black?.result, raw.white?.result)
-    opp = white
-  } else {
-    return null
+interface ParseWaiter {
+  games: LightGame[]
+  resolve: (games: LightGame[]) => void
+  reject: (error: Error) => void
+}
+
+let parser: Worker | null = null
+let bookReady = false
+let parseJob = 0
+const parseWaiters = new Map<number, ParseWaiter>()
+
+function parsingThread(): Worker {
+  if (!parser) {
+    parser = new Worker(new URL('./load.worker.ts', import.meta.url), { type: 'module' })
+    parser.onmessage = (event: MessageEvent<{ id: number; games: LightGame[]; done: boolean }>) => {
+      const waiter = parseWaiters.get(event.data.id)
+      if (!waiter) return
+      waiter.games.push(...event.data.games)
+      if (event.data.done) {
+        parseWaiters.delete(event.data.id)
+        waiter.resolve(waiter.games)
+      }
+    }
+    parser.onerror = () => {
+      for (const waiter of parseWaiters.values()) waiter.reject(new Error('La lecture des parties s’est arrêtée.'))
+      parseWaiters.clear()
+    }
   }
-  if (!result || !raw.pgn) return null
-  const played = readLine(raw.pgn, book)
-  if (!played) return null
-  const url = raw.url || ''
-  return {
-    id: `${user}|${url || index}|${raw.end_time || 0}`,
-    user,
-    display: color === 'w' ? white : black,
-    color,
-    result,
-    how,
-    tc: timeClassOf(raw.time_class),
-    opp: opp || 'inconnu',
-    end: raw.end_time || 0,
-    line: played.line,
-    moves: played.moves,
-    opening: played.opening,
-    url,
+  return parser
+}
+
+function parseMonth(user: string, book: Book, games: ApiGame[], start: number, signal: AbortSignal): Promise<LightGame[]> {
+  const thread = parsingThread()
+  if (!bookReady) {
+    thread.postMessage({ type: 'book', book })
+    bookReady = true
   }
+  const id = ++parseJob
+  return new Promise((resolve, reject) => {
+    const abort = () => {
+      parseWaiters.delete(id)
+      reject(new DOMException('Arrêté', 'AbortError'))
+    }
+    if (signal.aborted) {
+      abort()
+      return
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    parseWaiters.set(id, {
+      games: [],
+      resolve: (rows) => {
+        signal.removeEventListener('abort', abort)
+        resolve(rows)
+      },
+      reject: (error) => {
+        signal.removeEventListener('abort', abort)
+        reject(error)
+      },
+    })
+    thread.postMessage({ type: 'month', id, user, games, start })
+  })
 }
 
 export async function loadPlayerSince(
   username: string,
   book: Book,
   sinceEnd: number,
-  hooks: { onProgress: (text: string) => void; signal: AbortSignal },
+  hooks: { onProgress: (text: string, ratio?: number) => void; signal: AbortSignal },
 ): Promise<LightGame[]> {
   const user = username.trim().toLowerCase()
   const start = new Date(sinceEnd * 1000)
@@ -218,7 +180,7 @@ export async function loadPlayerSince(
     if (hooks.signal.aborted) throw new DOMException('Arrêté', 'AbortError')
     step += 1
     const mm = String(month).padStart(2, '0')
-    hooks.onProgress(`Mise à jour · ${step} / ${total}`)
+    hooks.onProgress(`Mise à jour · ${step} / ${total}`, (step - 1) / total)
     const url = `https://api.chess.com/pub/player/${encodeURIComponent(user)}/games/${year}/${mm}`
     let list: ApiGame[] = []
     try {
@@ -227,11 +189,9 @@ export async function loadPlayerSince(
     } catch (error) {
       if (!(error instanceof Error) || error.message !== 'Ce pseudo n’existe pas sur Chess.com.') throw error
     }
-    for (const raw of list) {
-      seen += 1
-      const light = toLight(raw, user, book, seen)
-      if (light) games.push(light)
-    }
+    games.push(...(await parseMonth(user, book, list, seen, hooks.signal)))
+    seen += list.length
+    hooks.onProgress(`Mise à jour · ${step} / ${total}`, step / total)
     month += 1
     if (month === 13) {
       month = 1
@@ -244,7 +204,7 @@ export async function loadPlayerSince(
 export async function loadPlayer(
   username: string,
   book: Book,
-  hooks: { onProgress: (text: string) => void; signal: AbortSignal },
+  hooks: { onProgress: (text: string, ratio?: number) => void; signal: AbortSignal },
 ): Promise<LightGame[]> {
   const user = username.trim()
   const archives = await getJson<{ archives?: string[] }>(
@@ -257,13 +217,12 @@ export async function loadPlayer(
   let seen = 0
   for (let i = 0; i < months.length; i += 1) {
     if (hooks.signal.aborted) throw new DOMException('Arrêté', 'AbortError')
-    hooks.onProgress(`${i + 1} / ${months.length} mois · ${games.length.toLocaleString('fr-FR')} parties`)
+    hooks.onProgress(`${i + 1} / ${months.length} mois · ${games.length.toLocaleString('fr-FR')} parties`, i / months.length)
     const month = await getJson<{ games?: ApiGame[] }>(months[i], hooks.signal)
-    for (const raw of month.games || []) {
-      seen += 1
-      const light = toLight(raw, user.toLowerCase(), book, seen)
-      if (light) games.push(light)
-    }
+    const list = month.games || []
+    games.push(...(await parseMonth(user.toLowerCase(), book, list, seen, hooks.signal)))
+    seen += list.length
+    hooks.onProgress(`${i + 1} / ${months.length} mois · ${games.length.toLocaleString('fr-FR')} parties`, (i + 1) / months.length)
   }
   if (games.length === 0) throw new Error('Aucune partie classique avec des coups dans ces archives.')
   return games

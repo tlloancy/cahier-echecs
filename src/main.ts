@@ -3,7 +3,7 @@ import { analyzeLine } from './analyze.ts'
 import { boardHtml } from './board.ts'
 import { icons } from './icons.ts'
 import { loadBook, nameAlong } from './book.ts'
-import { completeMonth, loadPlayer, loadPlayerSince } from './api.ts'
+import { completeMonth, loadPlayer, loadPlayerSince, releaseMonths } from './api.ts'
 import { countryName, fetchCountry, flagSrc } from './countries.ts'
 import { mergeUser, onDatabaseBlocked, readCountries, readUser, writeCountry, writeGames, writePins, writeUser } from './db.ts'
 import { Engine } from './engine.ts'
@@ -46,6 +46,7 @@ const state: {
   analysis: AnalysisView | null
   generation: number
   renaming: boolean
+  progress: number | null
 } = {
   draft: '',
   user: '',
@@ -63,6 +64,7 @@ const state: {
   analysis: null,
   generation: 0,
   renaming: false,
+  progress: null,
 }
 
 let filterCache: { key: string; games: LightGame[] } | null = null
@@ -392,7 +394,12 @@ function render(): void {
         ${loaded ? `<button type="button" class="ghost" id="reload-all" ${state.phase === 'loading' ? 'disabled' : ''}>Tout retélécharger</button>` : ''}
         ${state.phase === 'loading' ? `<button class="icon stop" type="button" id="cancel" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : ''}
       </form>`
-  const status = `<p id="status" class="status ${state.phase === 'error' ? 'error' : ''}" role="status">${esc(state.message)}</p>`
+  const ratio = state.progress == null ? 0 : Math.round(state.progress * 100)
+  const bar =
+    state.phase === 'loading'
+      ? `<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${ratio}" aria-label="Chargement"><span id="load-bar" style="width:${ratio}%"></span></div>`
+      : ''
+  const status = `<p id="status" class="status ${state.phase === 'error' ? 'error' : ''}" role="status">${esc(state.message)}</p>${bar}`
   const head = loaded
     ? `<header class="top"><div class="identity"><p class="eyebrow">Cahier d’échecs</p>${form}</div></header>${status}`
     : `<header><h1 class="serif">Cahier d’échecs</h1><p class="lede">Tes ouvertures, tes scores, les lignes que tu épingles. Les parties restent dans ce navigateur.</p></header><section class="panel">${form}${status}</section>`
@@ -405,6 +412,16 @@ function render(): void {
       if (caret !== null) field.setSelectionRange(caret, caret)
     }
   }
+}
+
+function setProgress(ratio: number | null): void {
+  state.progress = ratio
+  const bar = document.getElementById('load-bar')
+  const track = bar?.parentElement
+  if (!(bar instanceof HTMLElement) || !(track instanceof HTMLElement)) return
+  const width = ratio == null ? 0 : Math.round(ratio * 100)
+  bar.style.width = `${width}%`
+  track.setAttribute('aria-valuenow', String(width))
 }
 
 function setMessage(text: string, error = false): void {
@@ -574,6 +591,7 @@ async function fillMoves(signal: AbortSignal): Promise<void> {
     stepCache = null
     if (currentView().rows.length > before) render()
   }
+  releaseMonths()
   setMessage(`${num(state.games.length)} parties en mémoire.`)
 }
 
@@ -612,6 +630,7 @@ async function load(username: string, full = false): Promise<void> {
   state.phase = 'loading'
   state.draft = trimmed
   state.message = full ? 'Lecture des archives…' : 'Mise à jour…'
+  state.progress = 0
   state.analysis = null
   render()
   try {
@@ -622,11 +641,17 @@ async function load(username: string, full = false): Promise<void> {
     const fresh = incremental
       ? await loadPlayerSince(trimmed, state.book, since, {
           signal: controller.signal,
-          onProgress: (text) => setMessage(text),
+          onProgress: (text, ratio) => {
+            setMessage(text)
+            if (ratio != null) setProgress(ratio)
+          },
         })
       : await loadPlayer(trimmed, state.book, {
           signal: controller.signal,
-          onProgress: (text) => setMessage(text),
+          onProgress: (text, ratio) => {
+            setMessage(text)
+            if (ratio != null) setProgress(ratio)
+          },
         })
     const display = fresh[0]?.display || known[0]?.display || trimmed
     const previousPins = state.user === user ? state.pins : ((await readUser(user))?.pins ?? [])
@@ -654,6 +679,7 @@ async function load(username: string, full = false): Promise<void> {
     filterCache = null
     stepCache = null
     state.phase = 'ready'
+    state.progress = null
     state.message = `${num(games.length)} parties ${incremental ? 'en mémoire' : 'chargées'}.`
     await rememberCountries()
     render()
@@ -661,11 +687,13 @@ async function load(username: string, full = false): Promise<void> {
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') {
       state.phase = state.games.length ? 'ready' : 'idle'
+      state.progress = null
       state.message = 'Chargement arrêté.'
       render()
       return
     }
     state.phase = 'error'
+    state.progress = null
     state.message = error instanceof Error ? error.message : 'Le chargement a échoué.'
     render()
   }

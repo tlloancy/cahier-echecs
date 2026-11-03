@@ -3,7 +3,7 @@ import type { Color, Move } from 'chessops/types'
 import { makeFen } from 'chessops/fen'
 import { makeSan, parseSan } from 'chessops/san'
 import { parseUci } from 'chessops/util'
-import { ensureMoves } from './api.ts'
+import { ensureMoves, releaseMonths } from './api.ts'
 import { writeGame } from './db.ts'
 import { centipawnLoss, Engine, whiteCentipawns, type EngineScore } from './engine.ts'
 import { gamesOnLine } from './stats.ts'
@@ -175,5 +175,6 @@ export async function analyzeLine(
   }
 
   failles.sort((a, b) => b.cpl - a.cpl)
+  releaseMonths()
   return { failles: failles.slice(0, 8), decisifs: decisifs.slice(0, 8) }
 }

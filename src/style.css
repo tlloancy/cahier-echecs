@@ -130,6 +130,37 @@ button:disabled { opacity: 0.55; cursor: default; }
 .status { min-height: 1.4rem; margin: 0.8rem 0 0; color: var(--muted); }
 .status.error { color: var(--wax); }
 
+.progress {
+  margin-top: 0.45rem;
+  height: 0.35rem;
+  background: var(--line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--ink);
+  position: relative;
+  overflow: hidden;
+  transition: width 0.25s linear;
+}
+
+.progress span::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255, 250, 240, 0.55), transparent);
+  animation: load-slide 1s linear infinite;
+}
+
+@keyframes load-slide {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
 .summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
