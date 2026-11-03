@@ -434,6 +434,7 @@ function togglePin(line: string): void {
 function go(path: string[]): void {
   state.path = path
   render()
+  void fillLineCountries(path)
 }
 
 function opponentNames(): string[] {
@@ -497,21 +498,45 @@ function showFlag(name: string, code: string): void {
   paintCountryStrip()
 }
 
+const countryWait = new Set<string>()
+
+async function ensureCountry(name: string): Promise<void> {
+  const key = name.toLowerCase()
+  const signal = countryAbort?.signal
+  if (!key || state.countries[key] || countryWait.has(key) || !signal || signal.aborted) return
+  countryWait.add(key)
+  try {
+    const code = await fetchCountry(name, signal)
+    if (signal.aborted) return
+    const saved = code || '-'
+    state.countries[key] = saved
+    await writeCountry(name, saved)
+    if (code) showFlag(name, code)
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') return
+  } finally {
+    countryWait.delete(key)
+  }
+}
+
 async function fillCountries(signal: AbortSignal): Promise<void> {
-  const missing = opponentNames().filter((name) => !state.countries[name.toLowerCase()])
+  const missing = opponentNames()
+    .filter((name) => !state.countries[name.toLowerCase()])
+    .slice(0, 50)
   for (const name of missing) {
     if (signal.aborted) return
-    try {
-      const code = await fetchCountry(name, signal)
-      if (signal.aborted) return
-      const saved = code || '-'
-      state.countries[name.toLowerCase()] = saved
-      await writeCountry(name, saved)
-      if (code) showFlag(name, code)
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') return
-    }
+    await ensureCountry(name)
   }
+}
+
+async function fillLineCountries(path: string[]): Promise<void> {
+  if (!path.length) return
+  const missing = [
+    ...new Set(gamesOnLine(state.games, path).map((game) => game.opp)),
+  ]
+    .filter((name) => !state.countries[name.toLowerCase()])
+    .slice(0, 50)
+  for (const name of missing) await ensureCountry(name)
 }
 
 async function fillMoves(signal: AbortSignal): Promise<void> {
@@ -816,6 +841,9 @@ function bind(): void {
     button.addEventListener('click', () => togglePin(button.dataset.drop || ''))
   }
   for (const button of app.querySelectorAll<HTMLButtonElement>('[data-opp]')) {
+    button.addEventListener('pointerenter', () => {
+      void ensureCountry(button.dataset.opp || '')
+    })
     button.addEventListener('click', () => {
       const name = button.dataset.opp || ''
       const key = name.toLowerCase()
