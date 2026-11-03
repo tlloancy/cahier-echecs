@@ -4,7 +4,6 @@ function svg(body: string, tone = ''): string {
 
 export const icons = {
   refresh: svg('<path d="M20 12a8 8 0 1 1-2.2-5.5"/><path d="M20 4v5h-5"/>'),
-  download: svg('<path d="M12 4v10"/><path d="m8 10 4 4 4-4"/><path d="M5 19h14"/>'),
   stop: svg('<rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none"/>'),
   flip: svg('<path d="M7 8h10l-2.5-2.5"/><path d="M17 16H7l2.5 2.5"/>'),
   pin: svg('<path d="M9 10.5 14 5.5l4.5 4.5-5 5L12 16.5 7.5 21 6 19.5 10.5 15 9 10.5z"/><path d="M14 10.5 9.5 15"/>'),
@@ -40,4 +39,6 @@ export const icons = {
   chevron: svg('<path d="m9 6 6 6-6 6"/>'),
   meter: svg('<rect x="3" y="10" width="18" height="4.2" rx="2"/><rect x="3" y="10" width="8" height="4.2" rx="2" fill="currentColor" stroke="none"/>'),
   eval: '<svg class="ico eval" viewBox="0 0 24 24" aria-hidden="true"><rect x="7.5" y="2.5" width="9" height="19" rx="1.5" fill="#f4efe6" stroke="#1c1612" stroke-width="1.5"/><rect x="9" y="12" width="6" height="8.2" fill="#1c1612"/></svg>',
+  arrow: svg('<path d="M4.5 12h13"/><path d="m12.5 6.5 5.5 5.5-5.5 5.5"/>'),
+  play: svg('<path fill="currentColor" stroke="none" d="M8 5.8v12.4l10.2-6.2z"/>'),
 }

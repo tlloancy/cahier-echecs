@@ -21,6 +21,7 @@ import {
 import type { Book, Filters, Finding, LightGame, Tally } from './types.ts'
 
 const LAST_KEY = 'cahier-echecs-user'
+const EXAMPLE = 'chesscom'
 
 interface AnalysisView {
   line: string
@@ -417,11 +418,24 @@ function dashboard(): string {
     </div>`
 }
 
+function homePreview(): string {
+  return `<div class="home-stage">
+      <div class="home-preview" aria-hidden="true">
+        <div class="mock-stats"><i></i><i></i><i></i><i></i></div>
+        <div class="mock-main">
+          <div class="mock-rows"><i></i><i></i><i></i><i></i><i></i></div>
+          <div class="mock-board"></div>
+        </div>
+      </div>
+      <button type="button" class="icon primary play" id="demo" aria-label="Exemple" title="Exemple">${icons.play}</button>
+    </div>`
+}
+
 function render(): void {
   const focus = document.activeElement instanceof HTMLElement ? document.activeElement.id : ''
   const caret = document.activeElement instanceof HTMLInputElement ? document.activeElement.selectionStart : null
   const loaded = state.games.length > 0
-  const field = `<label>${loaded ? '<span class="sr">Pseudo Chess.com</span>' : 'Pseudo Chess.com'}
+  const field = `<label><span class="sr">Pseudo Chess.com</span>
           <input id="pseudo" name="pseudo" autocomplete="username" required value="${esc(state.draft)}" />
         </label>`
   const identity = loaded && !state.renaming
@@ -429,7 +443,7 @@ function render(): void {
     : field
   const form = `<form class="load" id="load-form">
         ${identity}
-        <button class="icon primary" type="submit" aria-label="${loaded ? 'Mettre à jour' : 'Charger'}" title="${loaded ? 'Mettre à jour' : 'Charger'}" ${state.phase === 'loading' ? 'disabled' : ''}>${loaded ? icons.refresh : icons.download}</button>
+        <button class="icon primary" type="submit" aria-label="${loaded ? 'Mettre à jour' : 'Charger'}" title="${loaded ? 'Mettre à jour' : 'Charger'}" ${state.phase === 'loading' ? 'disabled' : ''}>${loaded ? icons.refresh : icons.arrow}</button>
         ${state.phase === 'loading' ? `<button class="icon stop" type="button" id="cancel" aria-label="Arrêter" title="Arrêter">${icons.stop}</button>` : ''}
       </form>`
   const ratio = state.progress == null ? 0 : Math.round(state.progress * 100)
@@ -440,7 +454,7 @@ function render(): void {
   const status = `<p id="status" class="status ${state.phase === 'error' ? 'error' : ''}" role="status">${esc(state.message)}</p>${bar}`
   const head = loaded
     ? `<header class="top"><div class="identity"><p class="eyebrow">Cahier d’échecs</p>${form}</div></header>${status}`
-    : `<header><h1 class="serif">Cahier d’échecs</h1><p class="lede">Tes ouvertures, tes scores, les lignes que tu épingles. Les parties restent dans ce navigateur.</p></header><section class="panel">${form}${status}</section>`
+    : `<h1 class="sr">Cahier d’échecs</h1><section class="panel home">${form}${status}${homePreview()}</section>`
   app.innerHTML = `<main class="wrap">${head}${loaded ? dashboard() : ''}</main>`
   bind()
   if (focus) {
@@ -835,6 +849,11 @@ function bind(): void {
     state.renaming = true
     render()
     document.getElementById('pseudo')?.focus()
+  })
+  document.getElementById('demo')?.addEventListener('click', () => {
+    state.draft = EXAMPLE
+    state.renaming = false
+    void load(EXAMPLE)
   })
   document.getElementById('load-form')?.addEventListener('submit', (event) => {
     event.preventDefault()
