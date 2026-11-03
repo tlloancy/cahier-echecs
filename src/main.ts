@@ -606,6 +606,7 @@ async function fillCountries(signal: AbortSignal): Promise<void> {
     if (signal.aborted) return
     await ensureCountry(name)
   }
+  if (!signal.aborted) render()
 }
 
 async function fillLineCountries(path: string[]): Promise<void> {

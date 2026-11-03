@@ -226,7 +226,7 @@ button:disabled { opacity: 0.55; cursor: default; }
 .tree-go:hover .chev,
 .opp:hover .chev { color: var(--ink); transform: translateX(3px); }
 .n { display: inline-flex; align-items: center; gap: 0.28rem; font-variant-numeric: tabular-nums; }
-.n .ico { width: 0.85rem; height: 0.85rem; color: var(--muted); }
+.n .ico { width: 1rem; height: 1rem; color: var(--muted); }
 
 .progress {
   margin-top: 0.45rem;
@@ -287,7 +287,7 @@ button:disabled { opacity: 0.55; cursor: default; }
   line-height: 1;
 }
 
-.stat .mark .ico { width: 1.25rem; height: 1.25rem; }
+.stat .mark .ico { width: 1.45rem; height: 1.45rem; }
 .stat.w .mark { color: var(--win); }
 .stat.d .mark { color: var(--draw); }
 .stat.l .mark { color: var(--loss); }

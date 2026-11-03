@@ -14,7 +14,7 @@ export const icons = {
   spark: svg('<path d="M12 3v6M12 15v6M3 12h6M15 12h6M6 6l3 3M15 15l3 3M18 6l-3 3M9 15l-3 3"/>'),
   users: svg('<circle cx="9" cy="9" r="3"/><circle cx="16" cy="10" r="2.2"/><path d="M3.5 19c.6-2.6 2.8-4 5.5-4s4.9 1.4 5.5 4"/><path d="M14 15.2c1.6-.4 3.2.2 4.2 1.8"/>'),
   bullet: svg(
-    '<g transform="rotate(-38 12 12)" fill="currentColor" stroke="none"><path d="M4.8 10.3h7.4l5.8 1.7-5.8 1.7H4.8a1.1 1.1 0 0 1-1.1-1.1v-1.2a1.1 1.1 0 0 1 1.1-1.1z"/><path d="M7.1 10.5v3" stroke="#f4efe6" stroke-width="1.1" fill="none"/></g>',
+    '<g transform="rotate(-40 12 12)" fill="currentColor" stroke="none"><path d="M4.2 8.6h8.2c.6 0 1.1.2 1.5.6L19.2 12l-5.3 2.8c-.4.4-.9.6-1.5.6H4.2A1.4 1.4 0 0 1 2.8 14v-4a1.4 1.4 0 0 1 1.4-1.4z"/><path d="M6.4 9.2v5.6" stroke="#f4efe6" stroke-width="1.15"/></g>',
     'tc-bullet',
   ),
   blitz: svg('<path fill="currentColor" stroke="none" d="M13.2 2.6 5.4 13.2h6.1l-1.3 8.2 8.4-11.2h-6.2z"/>', 'tc-blitz'),
@@ -29,9 +29,7 @@ export const icons = {
   link: svg('<path d="M14 6h4v4"/><path d="M10 14 18 6"/><path d="M10 6H6v12h12v-4"/>'),
   both: svg('<circle cx="12" cy="12" r="7"/><path d="M12 5a7 7 0 0 0 0 14z" fill="currentColor" stroke="none"/>'),
   rows: svg('<path d="M5 7h14M5 12h14M5 17h14"/>'),
-  pawn: svg(
-    '<circle cx="12" cy="7.5" r="2.35" fill="currentColor" stroke="none"/><path d="M9.1 18.6c.8-3.4 1.6-5 2.9-5s2.1 1.6 2.9 5z" fill="currentColor" stroke="none"/><path d="M7.4 18.7h9.2" fill="none"/>',
-  ),
+  pawn: '<svg class="ico" viewBox="0 0 45 45" aria-hidden="true"><circle cx="22.5" cy="14" r="5.6" fill="currentColor"/><path d="M15.2 34c2-7.5 3.2-10.5 7.3-10.5s5.3 3 7.3 10.5z" fill="currentColor"/><rect x="13" y="33.2" width="19" height="3.6" rx="1" fill="currentColor"/></svg>',
   globe: svg('<circle cx="12" cy="12" r="8"/><path d="M4 12h16"/><path d="M12 4c2.4 2.2 3.6 5 3.6 8s-1.2 5.8-3.6 8c-2.4-2.2-3.6-5-3.6-8s1.2-5.8 3.6-8z"/>'),
   flag: svg('<path d="M6.5 20V4"/><path class="flag-fly" d="M6.5 5.2h9.4l-1.8 2.7 1.8 2.7H6.5z" fill="#fffdf9"/>'),
   hourglass: svg('<path d="M7.5 4h9M7.5 20h9"/><path d="M8.2 4.2c0 3.5 3.8 4.3 3.8 7.8s-3.8 4.3-3.8 7.8M15.8 4.2c0 3.5-3.8 4.3-3.8 7.8s3.8 4.3 3.8 7.8"/>'),
