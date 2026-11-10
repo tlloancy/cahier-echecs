@@ -513,7 +513,7 @@ function render(): void {
       </form>`
   const ratio = state.progress == null ? 0 : Math.round(state.progress * 100)
   const bar =
-    state.phase === 'loading'
+    state.progress != null
       ? `<div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${ratio}" aria-label="Chargement"><span id="load-bar" style="width:${ratio}%"></span></div>`
       : ''
   const status = `<p id="status" class="status ${state.phase === 'error' ? 'error' : ''}" role="status">${esc(state.message)}</p>${bar}`
@@ -1152,11 +1152,21 @@ function bind(): void {
 
 async function boot(): Promise<void> {
   onDatabaseBlocked(() => setMessage('Ferme l’autre onglet du cahier pour continuer.'))
-  state.message = 'Chargement du livre d’ouvertures…'
+  state.progress = 0
+  state.message = 'Livre d’ouvertures · 0 %'
   render()
   try {
-    state.book = await loadBook()
+    let shown = 0
+    state.book = await loadBook((ratio) => {
+      const pct = Math.min(100, Math.round(ratio * 100))
+      setProgress(ratio)
+      if (pct === shown) return
+      shown = pct
+      setMessage(`Livre d’ouvertures · ${pct} %`)
+    })
+    state.progress = null
   } catch (error) {
+    state.progress = null
     state.phase = 'error'
     state.message = error instanceof Error ? error.message : 'Livre indisponible.'
     render()

@@ -5,10 +5,28 @@ import type { Book } from './types.ts'
 
 export const MAX_PLIES = 24
 
-export async function loadBook(): Promise<Book> {
+export async function loadBook(onProgress?: (ratio: number) => void): Promise<Book> {
   const response = await fetch(`${import.meta.env.BASE_URL}openings.json`)
-  if (!response.ok) throw new Error("Le livre d'ouvertures n'a pas pu être chargé.")
-  return (await response.json()) as Book
+  if (!response.ok || !response.body) throw new Error("Le livre d'ouvertures n'a pas pu être chargé.")
+  const total = Number(response.headers.get('content-length')) || 0
+  const reader = response.body.getReader()
+  const chunks: Uint8Array[] = []
+  let received = 0
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    received += value.byteLength
+    if (total > 0) onProgress?.(Math.min(1, received / total))
+  }
+  onProgress?.(1)
+  const bytes = new Uint8Array(received)
+  let offset = 0
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return JSON.parse(new TextDecoder().decode(bytes)) as Book
 }
 
 export function epd(pos: Position): string {
