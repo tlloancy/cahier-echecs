@@ -225,7 +225,7 @@ export async function writePins(user: string, pins: string[]): Promise<void> {
   }
 }
 
-export async function readCountries(names: string[]): Promise<Record<string, string>> {
+export async function readCountries(names: string[], onProgress?: (ratio: number) => void): Promise<Record<string, string>> {
   if (memoryOnly) {
     const found: Record<string, string> = {}
     for (const name of names) {
@@ -239,10 +239,18 @@ export async function readCountries(names: string[]): Promise<Record<string, str
     const database = await db()
     const found: Record<string, string> = {}
     const tx = database.transaction('countries')
-    for (const name of names) {
-      const key = name.toLowerCase()
+    let shown = -1
+    for (let index = 0; index < names.length; index += 1) {
+      const key = names[index].toLowerCase()
       const code = await tx.store.get(key)
       if (code) found[key] = code
+      if (onProgress && names.length) {
+        const pct = Math.round(((index + 1) / names.length) * 100)
+        if (pct !== shown) {
+          shown = pct
+          onProgress((index + 1) / names.length)
+        }
+      }
     }
     await tx.done
     return found

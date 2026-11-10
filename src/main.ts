@@ -551,6 +551,17 @@ function setProgress(ratio: number | null): void {
   track.setAttribute('aria-valuenow', String(width))
 }
 
+function eta(started: number, ratio: number): string {
+  if (ratio <= 0.05 || ratio >= 1) return ''
+  const elapsed = performance.now() - started
+  if (elapsed < 500) return ''
+  const seconds = Math.max(1, Math.round((elapsed * (1 - ratio)) / ratio / 1000))
+  if (seconds < 60) return ` · encore ${seconds} s`
+  const minutes = Math.floor(seconds / 60)
+  const rest = seconds % 60
+  return rest ? ` · encore ${minutes} min ${rest} s` : ` · encore ${minutes} min`
+}
+
 function setMessage(text: string, error = false): void {
   state.message = text
   state.phase = error ? 'error' : state.phase
@@ -587,8 +598,19 @@ function opponentNames(): string[] {
 
 async function rememberCountries(): Promise<void> {
   if (!state.games.length) return
-  const known = await readCountries(opponentNames())
+  const names = opponentNames()
+  if (!names.length) return
+  const started = performance.now()
+  let shown = -1
+  setMessage('Pays des adversaires · 0 %')
+  const known = await readCountries(names, (ratio) => {
+    const pct = Math.round(ratio * 100)
+    if (pct === shown) return
+    shown = pct
+    setMessage(`Pays des adversaires · ${pct} %${eta(started, ratio)}`)
+  })
   state.countries = { ...state.countries, ...known }
+  state.message = `${num(state.games.length)} parties en mémoire.`
 }
 
 function countryRows(): { code: string; games: number }[] {
@@ -774,11 +796,12 @@ async function load(username: string): Promise<void> {
   const since = known.reduce((max, game) => Math.max(max, game.end), 0)
   const started = byId.size
   let display = known[0]?.display || trimmed
+  const clock = performance.now()
   const hooks = {
     signal: controller.signal,
     onProgress: (text: string, ratio?: number) => {
       if (controller !== loadAbort) return
-      setMessage(text)
+      setMessage(ratio == null ? text : `${text}${eta(clock, ratio)}`)
       if (ratio != null) setProgress(ratio)
     },
     onMonth: async (rows: LightGame[]) => {
@@ -1163,16 +1186,17 @@ function bind(): void {
 async function boot(): Promise<void> {
   onDatabaseBlocked(() => setMessage('Ferme l’autre onglet du cahier pour continuer.'))
   state.progress = 0
-  state.message = 'Livre d’ouvertures · 0 %'
+  state.message = 'Chargement du livre d’ouvertures · 0 %'
   render()
   try {
     let shown = 0
+    const bookStarted = performance.now()
     state.book = await loadBook((ratio) => {
       const pct = Math.min(100, Math.round(ratio * 100))
       setProgress(ratio * 0.08)
       if (pct === shown) return
       shown = pct
-      setMessage(`Livre d’ouvertures · ${pct} %`)
+      setMessage(`Chargement du livre d’ouvertures · ${pct} %${eta(bookStarted, ratio)}`)
     })
     state.progress = null
   } catch (error) {
@@ -1192,14 +1216,15 @@ async function boot(): Promise<void> {
     let shown = -1
     state.progress = 0.08
     setProgress(0.08)
-    setMessage('Parties enregistrées · 0 %')
+    setMessage('Lecture des parties enregistrées · 0 %')
+    const gamesStarted = performance.now()
     await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
     await restore(last, (ratio) => {
       const pct = Math.min(99, Math.round(ratio * 100))
       setProgress(0.08 + Math.min(0.99, ratio) * 0.92)
       if (pct === shown) return
       shown = pct
-      setMessage(`Parties enregistrées · ${pct} %`)
+      setMessage(`Lecture des parties enregistrées · ${pct} %${eta(gamesStarted, ratio)}`)
     })
     state.progress = null
   }
