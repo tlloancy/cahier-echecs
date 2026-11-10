@@ -169,7 +169,7 @@ function currentView(): {
 }
 
 function endsHtml(endings: { mate: number; resign: number; time: number }): string {
-  return `<span class="ends"><span><span class="glyph">#</span>${num(endings.mate)}</span><span>${icons.flag}${num(endings.resign)}</span><span>${icons.hourglass}${num(endings.time)}</span></span>`
+  return `<span class="ends"><span>${num(endings.mate)}<span class="glyph">#</span></span><span>${num(endings.resign)}${icons.flag}</span><span>${num(endings.time)}${icons.hourglass}</span></span>`
 }
 
 function share(part: number, whole: number): number {
@@ -245,7 +245,7 @@ function findingList(mark: string, label: string, rows: Finding[], empty: string
           const detail = kind === 'faille' ? `${moveLabel(row.ply, row.san)} → ${row.best}` : moveLabel(row.ply, row.san)
           const loss = kind === 'faille' ? `<span class="loss ${sign.tone}">−${num(row.cpl)}</span>` : ''
           const times = `<span class="n" ${named('games')}>${icons.pawn}${num(timesPlayed(row.line, row.ply))}</span>`
-          return `<li><button type="button" class="finding" data-line="${esc(row.line)}" data-ply="${row.ply}"><span class="mark-move ${sign.tone}" data-tip-text="${esc(sign.name)}">${sign.glyph}</span><span class="finding-line"><span>${esc(detail)}</span>${times}</span>${loss}<span class="muted">${esc(row.opp)}</span></button>${link}</li>`
+          return `<li><button type="button" class="finding" data-line="${esc(row.line)}" data-ply="${row.ply}">${times}<span class="mark-move ${sign.tone}" data-tip-text="${esc(sign.name)}">${sign.glyph}</span><span>${esc(detail)}</span>${loss}<span class="muted">${esc(row.opp)}</span></button>${link}</li>`
         })
         .join('')
     : `<li class="muted">${esc(empty)}</li>`

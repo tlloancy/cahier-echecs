@@ -515,7 +515,7 @@ button.icon[aria-pressed="true"] .ico.tc-daily { color: inherit; }
 .finding-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.35rem; align-items: center; }
 .finding {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto;
   gap: 0.45rem;
   width: 100%;
   text-align: left;
@@ -526,9 +526,8 @@ button.icon[aria-pressed="true"] .ico.tc-daily { color: inherit; }
   padding: 0.35rem 0.2rem;
 }
 .finding:hover { background: var(--paper-2); }
-.finding-line { display: flex; align-items: baseline; gap: 0.4rem; min-width: 0; }
-.finding-line .n { color: var(--muted); font-size: 0.82rem; }
-.finding-line .n .ico { width: 0.85rem; height: 0.85rem; }
+.finding .n { color: var(--muted); font-size: 0.82rem; }
+.finding .n .ico { width: 0.85rem; height: 0.85rem; }
 .mark-move {
   display: inline-grid;
   place-items: center;
