@@ -17,16 +17,17 @@ export async function loadBook(onProgress?: (ratio: number) => void): Promise<Bo
     if (done) break
     chunks.push(value)
     received += value.byteLength
-    if (total > 0) onProgress?.(Math.min(1, received / total))
+    if (total > 0) onProgress?.(Math.min(0.99, received / total))
   }
-  onProgress?.(1)
   const bytes = new Uint8Array(received)
   let offset = 0
   for (const chunk of chunks) {
     bytes.set(chunk, offset)
     offset += chunk.byteLength
   }
-  return JSON.parse(new TextDecoder().decode(bytes)) as Book
+  const book = JSON.parse(new TextDecoder().decode(bytes)) as Book
+  onProgress?.(1)
+  return book
 }
 
 export function epd(pos: Position): string {

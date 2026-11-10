@@ -564,9 +564,17 @@ button.icon[aria-pressed="true"] .ico.tc-daily { color: inherit; }
   gap: 0.45rem;
   align-items: center;
 }
-.ends { display: inline-flex; gap: 0.4rem; font-variant-numeric: tabular-nums; }
-.ends > span { display: inline-flex; align-items: center; gap: 0.12rem; }
-.ends .ico { width: 0.85rem; height: 0.85rem; }
+.ends {
+  display: inline-flex;
+  gap: 0.35rem;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: var(--win);
+  font-variant-numeric: tabular-nums;
+}
+.ends > span { display: inline-flex; align-items: center; gap: 0.08rem; }
+.ends .ico { width: 0.72rem; height: 0.72rem; }
+.ends .flag-fly { fill: var(--win); }
 .ends .glyph { font-weight: 650; }
 .tree-head { color: var(--muted); padding: 0 0.4rem; }
 .tree-head .ico { width: 0.95rem; height: 0.95rem; }
@@ -706,7 +714,7 @@ button.icon[aria-pressed="true"] .ico.tc-daily { color: inherit; }
 @media (max-width: 720px) {
   .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tree-head, .tree-go { grid-template-columns: 2.6rem minmax(0, 1fr) auto auto 2.6rem 0.9rem; }
-  .ends { gap: 0.25rem; font-size: 0.82rem; }
+  .ends { gap: 0.2rem; font-size: 0.68rem; }
   .tree-go .bar, .tree-head .bar-slot { display: none; }
   .tree-go .gauge { width: 2.6rem; }
   h1 { font-size: 2rem; }

@@ -722,8 +722,8 @@ async function fillBackground(): Promise<void> {
   await fillCountries(controller.signal)
 }
 
-async function restore(user: string): Promise<void> {
-  const saved = await readUser(user)
+async function restore(user: string, onProgress?: (ratio: number) => void): Promise<void> {
+  const saved = await readUser(user, onProgress)
   if (!saved) return
   state.user = user
   state.display = saved.display
@@ -1178,7 +1178,20 @@ async function boot(): Promise<void> {
   } catch {
     state.message = 'Mode sans sauvegarde'
   }
-  if (last) await restore(last)
+  if (last) {
+    let shown = -1
+    state.progress = 0
+    setProgress(0)
+    setMessage('Parties enregistrées · 0 %')
+    await restore(last, (ratio) => {
+      const pct = Math.min(100, Math.round(ratio * 100))
+      setProgress(ratio)
+      if (pct === shown) return
+      shown = pct
+      setMessage(`Parties enregistrées · ${pct} %`)
+    })
+    state.progress = null
+  }
   else if (!unsaved()) state.message = ''
   if (unsaved()) state.message = 'Mode sans sauvegarde'
   await rememberCountries()

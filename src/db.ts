@@ -93,14 +93,44 @@ function readMemory(user: string): StoredUser | null {
   }
 }
 
-export async function readUser(user: string): Promise<StoredUser | null> {
-  if (memoryOnly) return readMemory(user)
+export async function readUser(user: string, onProgress?: (ratio: number) => void): Promise<StoredUser | null> {
+  if (memoryOnly) {
+    const saved = readMemory(user)
+    if (saved) onProgress?.(1)
+    return saved
+  }
   try {
     const database = await db()
-    const games = await database.getAllFromIndex('games', 'byUser', user)
+    if (!onProgress) {
+      const games = await database.getAllFromIndex('games', 'byUser', user)
+      if (games.length === 0) return null
+      const meta = await database.get('meta', user)
+      const pins = (await database.get('pins', user)) || []
+      return { games, pins, display: meta?.display || games[0].display || user, at: meta?.at || 0 }
+    }
+    const tx = database.transaction(['games', 'meta', 'pins'])
+    const meta = await tx.objectStore('meta').get(user)
+    const pins = (await tx.objectStore('pins').get(user)) || []
+    const total = meta?.count || 0
+    let cursor = await tx.objectStore('games').index('byUser').openCursor(user)
+    const games: LightGame[] = []
+    let seen = 0
+    let shown = -1
+    while (cursor) {
+      games.push(cursor.value)
+      seen += 1
+      if (total > 0) {
+        const ratio = Math.min(1, seen / total)
+        const pct = Math.round(ratio * 100)
+        if (pct !== shown) {
+          shown = pct
+          onProgress(ratio)
+        }
+      }
+      cursor = await cursor.continue()
+    }
+    onProgress(1)
     if (games.length === 0) return null
-    const meta = await database.get('meta', user)
-    const pins = (await database.get('pins', user)) || []
     return { games, pins, display: meta?.display || games[0].display || user, at: meta?.at || 0 }
   } catch {
     keepInMemory()
