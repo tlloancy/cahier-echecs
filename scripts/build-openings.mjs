@@ -4,13 +4,18 @@ import { parseSan } from 'chessops/san'
 import { makeFen } from 'chessops/fen'
 
 const files = ['a', 'b', 'c', 'd', 'e']
-const localDir = process.env.OPENINGS_DIR || '/tmp/openings'
+// OPENINGS_DIR : dossier local contenant a.tsv … e.tsv (facultatif, pour travailler hors ligne).
+// OPENINGS_REF : révision (commit ou tag) du dépôt lichess-org/chess-openings ; « master » par défaut.
+//   Pour un résultat reproductible, fixe un commit : OPENINGS_REF=<sha> npm run openings
+const localDir = process.env.OPENINGS_DIR || ''
+const ref = process.env.OPENINGS_REF || 'master'
 
 async function source(letter) {
   try {
+    if (!localDir) throw new Error('pas de dossier local')
     return await readFile(`${localDir}/${letter}.tsv`, 'utf8')
   } catch {
-    const url = `https://raw.githubusercontent.com/lichess-org/chess-openings/master/${letter}.tsv`
+    const url = `https://raw.githubusercontent.com/lichess-org/chess-openings/${ref}/${letter}.tsv`
     const response = await fetch(url)
     if (!response.ok) throw new Error(`Livre d'ouvertures introuvable : ${url}`)
     return await response.text()

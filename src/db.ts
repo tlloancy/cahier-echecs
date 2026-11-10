@@ -74,17 +74,26 @@ function db(): Promise<IDBPDatabase<CahierDB>> {
   return database
 }
 
-function readMemory(user: string): { games: LightGame[]; pins: string[]; display: string } | null {
+export interface StoredUser {
+  games: LightGame[]
+  pins: string[]
+  display: string
+  /** Dernière mise à jour (ms), 0 si inconnue. */
+  at: number
+}
+
+function readMemory(user: string): StoredUser | null {
   const games = [...memory.games.values()].filter((game) => game.user === user)
   if (games.length === 0) return null
   return {
     games,
     pins: memory.pins.get(user) || [],
     display: memory.meta.get(user)?.display || games[0].display || user,
+    at: memory.meta.get(user)?.at || 0,
   }
 }
 
-export async function readUser(user: string): Promise<{ games: LightGame[]; pins: string[]; display: string } | null> {
+export async function readUser(user: string): Promise<StoredUser | null> {
   if (memoryOnly) return readMemory(user)
   try {
     const database = await db()
@@ -92,7 +101,7 @@ export async function readUser(user: string): Promise<{ games: LightGame[]; pins
     if (games.length === 0) return null
     const meta = await database.get('meta', user)
     const pins = (await database.get('pins', user)) || []
-    return { games, pins, display: meta?.display || games[0].display || user }
+    return { games, pins, display: meta?.display || games[0].display || user, at: meta?.at || 0 }
   } catch {
     keepInMemory()
     return readMemory(user)
@@ -108,17 +117,17 @@ export async function writeUser(user: string, games: LightGame[], display: strin
     return
   }
   try {
-  const database = await db()
-  const tx = database.transaction('games', 'readwrite')
-  let cursor = await tx.store.index('byUser').openCursor(user)
-  while (cursor) {
-    cursor.delete()
-    cursor = await cursor.continue()
-  }
-  for (const game of games) tx.store.put(game)
-  await tx.done
-  await database.put('meta', { at: Date.now(), count: games.length, display }, user)
-  await database.put('pins', pins, user)
+    const database = await db()
+    const tx = database.transaction('games', 'readwrite')
+    let cursor = await tx.store.index('byUser').openCursor(user)
+    while (cursor) {
+      cursor.delete()
+      cursor = await cursor.continue()
+    }
+    for (const game of games) tx.store.put(game)
+    await tx.done
+    await database.put('meta', { at: Date.now(), count: games.length, display }, user)
+    await database.put('pins', pins, user)
   } catch {
     keepInMemory()
     await writeUser(user, games, display, pins)
@@ -132,13 +141,13 @@ export async function mergeUser(user: string, games: LightGame[], display: strin
     return
   }
   try {
-  const database = await db()
-  if (games.length) {
-    const tx = database.transaction('games', 'readwrite')
-    for (const game of games) tx.store.put(game)
-    await tx.done
-  }
-  await database.put('meta', { at: Date.now(), count, display }, user)
+    const database = await db()
+    if (games.length) {
+      const tx = database.transaction('games', 'readwrite')
+      for (const game of games) tx.store.put(game)
+      await tx.done
+    }
+    await database.put('meta', { at: Date.now(), count, display }, user)
   } catch {
     keepInMemory()
     await mergeUser(user, games, display, count)
@@ -230,4 +239,51 @@ export async function writeCountry(name: string, code: string): Promise<void> {
     keepInMemory()
     memory.countries.set(key, code)
   }
+}
+
+/** Toutes les lignes épinglées, tous joueurs confondus (pour l'export). */
+export async function readAllPins(): Promise<Record<string, string[]>> {
+  const out: Record<string, string[]> = {}
+  if (memoryOnly) {
+    for (const [user, pins] of memory.pins) if (pins.length) out[user] = pins
+    return out
+  }
+  try {
+    const database = await db()
+    const keys = await database.getAllKeys('pins')
+    for (const key of keys) {
+      const pins = await database.get('pins', key)
+      if (pins && pins.length) out[String(key)] = pins
+    }
+    return out
+  } catch {
+    keepInMemory()
+    return readAllPins()
+  }
+}
+
+/**
+ * Demande au navigateur de ne pas effacer les données du site quand il manque de place
+ * (Safari les supprime après 7 jours sans visite si on ne le demande pas).
+ * Renvoie true si le stockage est durable.
+ */
+export async function requestDurableStorage(): Promise<boolean> {
+  try {
+    const storage = typeof navigator !== 'undefined' ? navigator.storage : undefined
+    if (!storage?.persist) return false
+    if (storage.persisted && (await storage.persisted())) return true
+    return await storage.persist()
+  } catch {
+    return false
+  }
+}
+
+/** Remet le module à zéro (tests uniquement). */
+export function resetForTests(): void {
+  memoryOnly = false
+  database = null
+  memory.games.clear()
+  memory.meta.clear()
+  memory.pins.clear()
+  memory.countries.clear()
 }

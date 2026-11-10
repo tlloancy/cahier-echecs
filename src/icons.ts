@@ -38,5 +38,7 @@ export const icons = {
   meter: svg('<rect x="3" y="10" width="18" height="4.2" rx="2"/><rect x="3" y="10" width="8" height="4.2" rx="2" fill="currentColor" stroke="none"/>'),
   eval: '<svg class="ico eval" viewBox="0 0 24 24" aria-hidden="true"><rect x="7.5" y="2.5" width="9" height="19" rx="1.5" fill="#f4efe6" stroke="#1c1612" stroke-width="1.5"/><rect x="9" y="12" width="6" height="8.2" fill="#1c1612"/></svg>',
   arrow: svg('<path d="M4.5 12h13"/><path d="m12.5 6.5 5.5 5.5-5.5 5.5"/>'),
+  out: svg('<path d="M12 14V4"/><path d="m8 7 4-4 4 4"/><path d="M5 14v5h14v-5"/>'),
+  in: svg('<path d="M12 4v10"/><path d="m8 11 4 4 4-4"/><path d="M5 14v5h14v-5"/>'),
   play: svg('<path fill="currentColor" stroke="none" d="M8 5.8v12.4l10.2-6.2z"/>'),
 }

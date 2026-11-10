@@ -30,6 +30,8 @@ export const labels = {
   opponents: 'Adversaires',
   allOpponents: 'Tous les adversaires',
   pins: 'Lignes épinglées',
+  exportPins: 'Exporter les lignes',
+  importPins: 'Importer des lignes',
   weak: 'Où je perds des points',
   opponent: 'Adversaire',
   demo: 'Exemple',

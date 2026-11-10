@@ -20,12 +20,15 @@ export interface ApiGame {
 }
 
 const DRAWS = new Set(['agreed', 'repetition', 'stalemate', 'insufficient', '50move', 'timevsinsufficient'])
+const LOSSES = new Set(['lose', 'checkmated', 'timeout', 'resigned', 'abandoned', 'kingofthehill', 'threecheck', 'bughousepartnerlose'])
 
 function resultOf(code: string | undefined): GameResult | null {
   if (!code) return null
   if (code === 'win') return 'w'
   if (DRAWS.has(code)) return 'd'
-  return 'l'
+  // Un code inconnu n'est pas une défaite : mieux vaut ignorer la partie que fausser le bilan.
+  if (LOSSES.has(code)) return 'l'
+  return null
 }
 
 function endingOf(mine: string | undefined, theirs: string | undefined): Ending {

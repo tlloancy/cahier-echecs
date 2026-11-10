@@ -5,12 +5,13 @@ import { icons } from './icons.ts'
 import { loadBook, nameAlong } from './book.ts'
 import { completeMonth, loadPlayer, loadPlayerSince, releaseMonths } from './api.ts'
 import { countryName, fetchCountry, flagSrc } from './countries.ts'
-import { mergeUser, onDatabaseBlocked, readCountries, readUser, unsaved, writeCountry, writeGames, writePins, writeUser } from './db.ts'
+import { mergeUser, onDatabaseBlocked, readAllPins, readCountries, readUser, requestDurableStorage, unsaved, writeCountry, writeGames, writePins } from './db.ts'
+import { buildPinsFile, mergePins, parsePinsFile } from './pins.ts'
 import { Engine } from './engine.ts'
 import { labels, type LabelKey } from './labels.ts'
 import {
   gamesOnLine,
-  losingOpenings,
+  losingOpeningsAsync,
   nextRows,
   opponentRows,
   selectGames,
@@ -74,7 +75,8 @@ const state: {
 
 let filterCache: { key: string; games: LightGame[] } | null = null
 let stepCache: { key: string; here: Tally; name: string; rows: ContRow[] } | null = null
-let lossCache: { key: string; rows: LossRow[] } | null = null
+let lossCache: { key: string; rows: LossRow[] | null } | null = null
+let lossJob = 0
 let loadAbort: AbortController | null = null
 let countryAbort: AbortController | null = null
 let analysisJob = 0
@@ -257,8 +259,21 @@ function loupeSection(): string {
 
 function lossSection(): string {
   const key = String(state.generation)
-  if (!lossCache || lossCache.key !== key) lossCache = { key, rows: losingOpenings(state.games, state.book) }
+  if (!lossCache || lossCache.key !== key) {
+    const job = ++lossJob
+    lossCache = { key, rows: null }
+    const games = state.games
+    const book = state.book
+    void losingOpeningsAsync(games, book, () => job !== lossJob).then((rows) => {
+      if (job !== lossJob || !rows || lossCache?.key !== key) return
+      lossCache = { key, rows }
+      render()
+    })
+  }
   const rows = lossCache.rows
+  if (!rows) {
+    return `<section class="panel losses"><h2 class="icon-title" ${named('weak')}>${icons.trend}<span class="pip dot"></span><span class="sr">${labels.weak}</span></h2></section>`
+  }
   const list = rows.length
     ? `${scoreHead(1, 'loss')}<ul class="loss-list">${rows
         .map(
@@ -453,7 +468,13 @@ function dashboard(): string {
           </ul>
         </section>
         <section class="panel">
-          <h2 class="icon-title" ${named('pins')}>${icons.pin}${state.pins.length ? `<span class="count-badge">${num(state.pins.length)}</span>` : ''}<span class="sr">${labels.pins}</span></h2>
+          <div class="toolbar">
+            <h2 class="icon-title" ${named('pins')}>${icons.pin}${state.pins.length ? `<span class="count-badge">${num(state.pins.length)}</span>` : ''}<span class="sr">${labels.pins}</span></h2>
+            <span class="toolbar-actions">
+              <button type="button" class="icon" id="pins-export" ${named('exportPins')}>${icons.out}</button>
+              <label class="icon" ${named('importPins')}>${icons.in}<input type="file" id="pins-import" accept="application/json,.json" hidden></label>
+            </span>
+          </div>
           ${pins}
         </section>
       </div>
@@ -715,7 +736,7 @@ async function restore(user: string): Promise<void> {
   state.message = `${num(saved.games.length)} parties en mémoire.`
 }
 
-async function load(username: string, full = false): Promise<void> {
+async function load(username: string): Promise<void> {
   const trimmed = username.trim()
   if (!trimmed) return
   loadAbort?.abort()
@@ -723,82 +744,131 @@ async function load(username: string, full = false): Promise<void> {
   const controller = new AbortController()
   loadAbort = controller
   analysisJob += 1
+  lossJob += 1
+  lossCache = null
   state.phase = 'loading'
   state.draft = trimmed
-  state.message = full ? 'Lecture des archives…' : 'Mise à jour…'
+  state.message = 'Mise à jour…'
   state.progress = 0
   state.analysis = null
   render()
-  try {
-    const user = trimmed.toLowerCase()
-    const known = state.user === user ? state.games : ((await readUser(user))?.games ?? [])
-    const since = known.reduce((max, game) => Math.max(max, game.end), 0)
-    const incremental = !full && since > 0
-    const fresh = incremental
-      ? await loadPlayerSince(trimmed, state.book, since, {
-          signal: controller.signal,
-          onProgress: (text, ratio) => {
-            setMessage(text)
-            if (ratio != null) setProgress(ratio)
-          },
-        })
-      : await loadPlayer(trimmed, state.book, {
-          signal: controller.signal,
-          onProgress: (text, ratio) => {
-            setMessage(text)
-            if (ratio != null) setProgress(ratio)
-          },
-        })
-    const display = fresh[0]?.display || known[0]?.display || trimmed
-    const previousPins = state.user === user ? state.pins : ((await readUser(user))?.pins ?? [])
-    let games: LightGame[]
-    if (incremental) {
-      const byId = new Map(known.map((game) => [game.id, game]))
-      for (const game of fresh) byId.set(game.id, game)
-      games = [...byId.values()]
-      await mergeUser(user, fresh, display, games.length)
-    } else {
-      games = fresh
-      await writeUser(user, games, display, previousPins)
-    }
-    try {
-      localStorage.setItem(LAST_KEY, user)
-    } catch {
-      state.message = 'Mode sans sauvegarde'
-    }
+
+  const user = trimmed.toLowerCase()
+  const sameUser = state.user === user
+  const stored = sameUser ? null : await readUser(user)
+  if (controller !== loadAbort) return
+  const known = sameUser ? state.games : (stored?.games ?? [])
+  const previousPins = sameUser ? state.pins : (stored?.pins ?? [])
+  const byId = new Map(known.map((game) => [game.id, game]))
+  const since = known.reduce((max, game) => Math.max(max, game.end), 0)
+  const started = byId.size
+  let display = known[0]?.display || trimmed
+  const hooks = {
+    signal: controller.signal,
+    onProgress: (text: string, ratio?: number) => {
+      if (controller !== loadAbort) return
+      setMessage(text)
+      if (ratio != null) setProgress(ratio)
+    },
+    onMonth: async (rows: LightGame[]) => {
+      for (const game of rows) byId.set(game.id, game)
+      display = rows[0]?.display || display
+      await mergeUser(user, rows, display, byId.size)
+    },
+  }
+  const adopt = (): void => {
     state.user = user
     state.display = display
     state.draft = display
-    state.games = games
+    state.games = [...byId.values()]
     state.pins = previousPins
-    if (!incremental) {
+    if (!sameUser) {
       state.path = []
       state.filters = { color: 'all', tc: 'all', result: 'all', ending: 'all', country: null, opp: null }
     }
     state.generation += 1
     filterCache = null
     stepCache = null
+    lossCache = null
+    try {
+      localStorage.setItem(LAST_KEY, user)
+    } catch {
+      state.message = 'Mode sans sauvegarde'
+    }
+  }
+
+  try {
+    if (since > 0) await loadPlayerSince(trimmed, state.book, since, hooks)
+    else await loadPlayer(trimmed, state.book, hooks)
+    if (controller !== loadAbort) return
+    adopt()
     state.phase = 'ready'
     state.progress = null
-    state.message = unsaved()
-      ? 'Mode sans sauvegarde'
-      : `${num(games.length)} parties ${incremental ? 'en mémoire' : 'chargées'}.`
+    state.renaming = false
+    if (state.message !== 'Mode sans sauvegarde') {
+      state.message = unsaved() ? 'Mode sans sauvegarde' : `${num(state.games.length)} parties en mémoire.`
+    }
     await rememberCountries()
     render()
     void fillBackground()
+    void requestDurableStorage()
   } catch (error) {
+    if (controller !== loadAbort) return
+    const kept = byId.size > started
+    if (kept) adopt()
+    state.progress = null
     if (error instanceof DOMException && error.name === 'AbortError') {
       state.phase = state.games.length ? 'ready' : 'idle'
-      state.progress = null
       state.message = 'Chargement arrêté.'
-      render()
-      return
+    } else {
+      state.phase = state.games.length ? 'ready' : 'error'
+      state.message = error instanceof Error ? error.message : 'Le chargement a échoué.'
     }
-    state.phase = 'error'
-    state.progress = null
-    state.message = error instanceof Error ? error.message : 'Le chargement a échoué.'
     render()
+    if (kept) void fillBackground()
   }
+}
+
+async function exportPins(): Promise<void> {
+  const users = await readAllPins()
+  if (state.user && state.pins.length) users[state.user] = state.pins
+  if (!Object.keys(users).length) {
+    state.message = 'Rien à exporter.'
+    render()
+    return
+  }
+  const file = buildPinsFile(users)
+  const blob = new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `cahier-echecs-lignes-${new Date().toISOString().slice(0, 10)}.json`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+  state.message = 'Export téléchargé.'
+  render()
+}
+
+async function importPins(file: File): Promise<void> {
+  const parsed = file.size > 1_000_000 ? null : parsePinsFile(await file.text())
+  if (!parsed) {
+    state.message = 'Ce fichier n’est pas un export du cahier.'
+    render()
+    return
+  }
+  const all = await readAllPins()
+  let added = 0
+  for (const [user, lines] of Object.entries(parsed)) {
+    const current = user === state.user ? state.pins : (all[user] ?? [])
+    const merged = mergePins(current, lines)
+    added += merged.length - current.length
+    if (user === state.user) state.pins = merged
+    await writePins(user, merged)
+  }
+  state.message = added ? `${num(added)} ligne${added > 1 ? 's' : ''} importée${added > 1 ? 's' : ''}.` : 'Rien de nouveau.'
+  render()
 }
 
 function rememberFinding(kind: 'faille' | 'decisif', row: Finding): void {
@@ -857,6 +927,10 @@ async function startAnalysis(): Promise<void> {
   render()
   document.getElementById('loupe')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   try {
+    if (engine?.failed) {
+      engine.dispose()
+      engine = null
+    }
     if (!engine) engine = new Engine(engineUrl())
     const { games } = currentView()
     const result = await analyzeLine(games, state.path, state.book, engine, {
@@ -1020,6 +1094,13 @@ function bind(): void {
     render()
   })
   document.getElementById('pin-here')?.addEventListener('click', () => togglePin(pathKey(state.path)))
+  document.getElementById('pins-export')?.addEventListener('click', () => void exportPins())
+  document.getElementById('pins-import')?.addEventListener('change', (event) => {
+    const input = event.target as HTMLInputElement
+    const file = input.files?.[0]
+    input.value = ''
+    if (file) void importPins(file)
+  })
   document.getElementById('analyze')?.addEventListener('click', () => {
     document.getElementById('analysis-status')?.replaceChildren()
     void startAnalysis()

@@ -5,7 +5,7 @@ import { makeSan, parseSan } from 'chessops/san'
 import { parseUci } from 'chessops/util'
 import { completeMonth, releaseMonths } from './api.ts'
 import { writeGame } from './db.ts'
-import { centipawnLoss, Engine, whiteCentipawns, type EngineScore } from './engine.ts'
+import { centipawnLoss, Engine, lossFor, whiteCentipawns, type EngineScore } from './engine.ts'
 import { gamesOnLine } from './stats.ts'
 import type { Book, Finding, LightGame } from './types.ts'
 
@@ -15,6 +15,9 @@ const FAILLE_CP = 150
 const SACRIFICE = 2
 const BOOK_PLIES = 6
 const DECIDED_CP = 600
+const MAX_FAILURES = 3
+/** Une faille de mat vaut « beaucoup » : on plafonne pour garder un affichage lisible. */
+export const LOSS_CAP = 1000
 
 const VALUES: Record<string, number> = { pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9 }
 
@@ -43,6 +46,13 @@ function moveLabel(ply: number, san: string): string {
   return ply % 2 === 1 ? `${move}. ${san}` : `${move}… ${san}`
 }
 
+export interface AnalysisResult {
+  failles: Finding[]
+  decisifs: Finding[]
+  games: number
+  positions: number
+}
+
 export async function analyzeLine(
   games: LightGame[],
   path: string[],
@@ -54,19 +64,31 @@ export async function analyzeLine(
     onProgress: (text: string) => void
     onFinding: (kind: 'faille' | 'decisif', row: Finding) => void
   },
-): Promise<{ failles: Finding[]; decisifs: Finding[] }> {
+): Promise<AnalysisResult> {
   const sample = gamesOnLine(games, path).slice(0, SAMPLE)
   const failles: Finding[] = []
   const decisifs: Finding[] = []
   const seen = new Map<string, EngineScore>()
-  if (sample.length === 0) return { failles, decisifs }
+  let analysed = 0
+  if (sample.length === 0) return { failles, decisifs, games: 0, positions: 0 }
 
+  // Un moteur en panne ne doit jamais ressembler à « aucune faille » : après quelques échecs d'affilée, on s'arrête.
+  let failures = 0
   async function once(fen: string): Promise<EngineScore> {
     const hit = seen.get(fen)
     if (hit) return hit
-    const score = await engine.best(fen, DEPTH)
-    seen.set(fen, score)
-    return score
+    try {
+      const score = await engine.best(fen, DEPTH)
+      failures = 0
+      seen.set(fen, score)
+      return score
+    } catch (error) {
+      failures += 1
+      if (!hooks.stopped() && (engine.failed || failures >= MAX_FAILURES)) {
+        throw error instanceof Error ? error : new Error('Le moteur ne répond pas.')
+      }
+      throw error
+    }
   }
 
   for (let index = 0; index < sample.length; index += 1) {
@@ -108,11 +130,13 @@ export async function analyzeLine(
         if (answerCp == null) {
           try {
             answerScore = await once(makeFen(before.toSetup()))
-          } catch {
+          } catch (error) {
             if (hooks.stopped()) break
+            if (engine.failed || failures >= MAX_FAILURES) throw error
             pos.play(move)
             continue
           }
+          analysed += 1
           if (hooks.stopped()) break
           answerCp = whiteCentipawns(answerScore, side)
           const line = answerScore.pv.length ? answerScore.pv : answerScore.uci ? [answerScore.uci] : []
@@ -142,14 +166,16 @@ export async function analyzeLine(
           let follow: EngineScore
           try {
             follow = await once(makeFen(after.toSetup()))
-          } catch {
+          } catch (error) {
             if (hooks.stopped()) break
+            if (engine.failed || failures >= MAX_FAILURES) throw error
             pos.play(move)
             continue
           }
+          analysed += 1
           if (hooks.stopped()) break
           const followCp = whiteCentipawns(follow, other)
-          const loss = answerScore ? centipawnLoss(answerScore, follow, side) : answerCp - followCp
+          const loss = answerScore ? centipawnLoss(answerScore, follow, side) : lossFor(side, answerCp, followCp)
           if (loss >= FAILLE_CP) {
             const row: Finding = {
               url: game.url,
@@ -157,7 +183,7 @@ export async function analyzeLine(
               ply,
               san,
               best: bestSan,
-              cpl: Math.round(loss),
+              cpl: Math.min(LOSS_CAP, Math.round(loss)),
               line: moves,
             }
             failles.push(row)
@@ -180,5 +206,5 @@ export async function analyzeLine(
 
   failles.sort((a, b) => b.cpl - a.cpl)
   releaseMonths()
-  return { failles: failles.slice(0, 8), decisifs: decisifs.slice(0, 8) }
+  return { failles: failles.slice(0, 8), decisifs: decisifs.slice(0, 8), games: sample.length, positions: analysed }
 }

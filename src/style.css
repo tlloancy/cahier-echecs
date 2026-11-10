@@ -419,7 +419,7 @@ button:disabled { opacity: 0.55; cursor: default; }
 .piece.w circle[r="1.15"] { fill: #241910; stroke: none; }
 .piece.b circle[r="1.15"] { fill: #f7f1e4; stroke: none; }
 
-.icon, button.icon {
+.icon, button.icon, label.icon {
   width: 2.45rem;
   height: 2.45rem;
   min-height: 2.45rem;

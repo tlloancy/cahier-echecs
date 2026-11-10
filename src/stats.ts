@@ -121,44 +121,52 @@ export interface LossRow {
   name: string
   path: string[]
   games: number
+  w: number
+  d: number
+  l: number
   score: number
 }
 
-export function losingOpenings(games: LightGame[], book: Book): LossRow[] {
-  const groups = new Map<string, { tally: Tally; paths: Map<string, number> }>()
-  for (const game of games) {
-    const pos = Chess.default()
-    let name = ''
-    let path: string[] = []
-    const walked: string[] = []
-    let quiet = 0
-    for (const san of playedLine(game).split(' ')) {
-      if (!san) continue
-      const move = parseSan(pos, san)
-      if (!move) break
-      pos.play(move)
-      walked.push(san)
-      const hit = book[epd(pos)]
-      if (hit) {
-        name = hit.name
-        path = walked.slice()
-        quiet = 0
-      } else if (name) {
-        quiet += 1
-        if (quiet >= 6) break
-      }
-      if (walked.length >= 30) break
+interface LossGroup {
+  tally: Tally
+  paths: Map<string, number>
+}
+
+function addToLossGroups(groups: Map<string, LossGroup>, game: LightGame, book: Book): void {
+  const pos = Chess.default()
+  let name = ''
+  let path: string[] = []
+  const walked: string[] = []
+  let quiet = 0
+  for (const san of playedLine(game).split(' ')) {
+    if (!san) continue
+    const move = parseSan(pos, san)
+    if (!move) break
+    pos.play(move)
+    walked.push(san)
+    const hit = book[epd(pos)]
+    if (hit) {
+      name = hit.name
+      path = walked.slice()
+      quiet = 0
+    } else if (name) {
+      quiet += 1
+      if (quiet >= 6) break
     }
-    if (!name) continue
-    let group = groups.get(name)
-    if (!group) {
-      group = { tally: emptyTally(), paths: new Map() }
-      groups.set(name, group)
-    }
-    addResult(group.tally, game.result)
-    const key = path.join('|')
-    group.paths.set(key, (group.paths.get(key) || 0) + 1)
+    if (walked.length >= 30) break
   }
+  if (!name) return
+  let group = groups.get(name)
+  if (!group) {
+    group = { tally: emptyTally(), paths: new Map() }
+    groups.set(name, group)
+  }
+  addResult(group.tally, game.result)
+  const key = path.join('|')
+  group.paths.set(key, (group.paths.get(key) || 0) + 1)
+}
+
+function lossRowsFrom(groups: Map<string, LossGroup>): LossRow[] {
   const rows: LossRow[] = []
   for (const [name, group] of groups) {
     if (group.tally.games < 10) continue
@@ -174,11 +182,46 @@ export function losingOpenings(games: LightGame[], book: Book): LossRow[] {
       name,
       path: bestPath ? bestPath.split('|') : [],
       games: group.tally.games,
+      w: group.tally.w,
+      d: group.tally.d,
+      l: group.tally.l,
       score: scorePercent(group.tally),
     })
   }
   rows.sort((a, b) => a.score - b.score || b.games - a.games || a.name.localeCompare(b.name, 'fr'))
   return rows.slice(0, 5)
+}
+
+export function losingOpenings(games: LightGame[], book: Book): LossRow[] {
+  const groups = new Map<string, LossGroup>()
+  for (const game of games) addToLossGroups(groups, game, book)
+  return lossRowsFrom(groups)
+}
+
+function nextTurn(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, 0))
+}
+
+/**
+ * Même calcul que `losingOpenings`, mais par petits paquets : la page reste utilisable pendant le calcul
+ * (sur 60 000 parties, la version d'un seul tenant bloquait l'écran plusieurs secondes).
+ * Renvoie null si `stopped()` devient vrai (les parties ont changé entre-temps).
+ */
+export async function losingOpeningsAsync(
+  games: LightGame[],
+  book: Book,
+  stopped: () => boolean = () => false,
+  slice = 250,
+): Promise<LossRow[] | null> {
+  const groups = new Map<string, LossGroup>()
+  for (let i = 0; i < games.length; i += 1) {
+    addToLossGroups(groups, games[i], book)
+    if ((i + 1) % slice === 0) {
+      await nextTurn()
+      if (stopped()) return null
+    }
+  }
+  return stopped() ? null : lossRowsFrom(groups)
 }
 
 export function gamesOnLine(games: LightGame[], path: string[]): LightGame[] {
@@ -196,7 +239,7 @@ export function timeLabel(tc: TimeClass | 'all'): string {
     case 'rapid':
       return 'Rapide'
     case 'daily':
-      return 'Correspondance'
+      return 'Quotidien'
     default:
       return 'Autre'
   }

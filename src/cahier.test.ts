@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { epd } from './book.ts'
 import { whiteCentipawns, type EngineScore } from './engine.ts'
 import { readLine } from './lighten.ts'
-import { losingOpenings, nextRows, scorePercent } from './stats.ts'
+import { losingOpenings, losingOpeningsAsync, nextRows, scorePercent } from './stats.ts'
 import type { LightGame } from './types.ts'
 
 function game(patch: Partial<LightGame> & Pick<LightGame, 'id' | 'line' | 'result'>): LightGame {
@@ -84,5 +84,37 @@ describe('whiteCentipawns', () => {
   it('renverse le score quand les noirs ont le trait', () => {
     expect(score(40, 'white')).toBe(40)
     expect(score(40, 'black')).toBe(-40)
+  })
+})
+
+describe('ouvertures à travailler (calcul sans bloquer l’écran)', () => {
+  const ruy = ['e4', 'e5', 'Nf3', 'Nc6', 'Bb5']
+  const epdOf = (sans: string[]): string => {
+    const pos = Chess.default()
+    for (const san of sans) pos.play(parseSan(pos, san)!)
+    return epd(pos)
+  }
+  const book = { [epdOf(ruy)]: { eco: 'C60', name: 'Ruy Lopez' } }
+  const many = (n: number, result: 'w' | 'd' | 'l') =>
+    Array.from({ length: n }, (_, i) => game({ id: `${result}${i}`, line: ruy.join(' '), moves: ruy.join(' '), result }))
+
+  it('donne le même classement que le calcul d’un seul tenant', async () => {
+    const games = [...many(8, 'l'), ...many(4, 'w'), ...many(2, 'd')]
+    const sync = losingOpenings(games, book)
+    const async = await losingOpeningsAsync(games, book, () => false, 3)
+    expect(async).toEqual(sync)
+    expect(sync[0]).toMatchObject({ name: 'Ruy Lopez', games: 14, w: 4, d: 2, l: 8 })
+  })
+
+  it('ignore une ouverture avec moins de 10 parties', async () => {
+    expect(await losingOpeningsAsync(many(9, 'l'), book)).toEqual([])
+  })
+
+  it('s’interrompt quand les parties ont changé entre-temps', async () => {
+    let stop = false
+    const games = many(40, 'l')
+    const promise = losingOpeningsAsync(games, book, () => stop, 5)
+    stop = true
+    expect(await promise).toBeNull()
   })
 })

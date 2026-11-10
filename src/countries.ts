@@ -1,4 +1,4 @@
-import { serial } from './api.ts'
+import { NotFoundError, readJson, serial } from './api.ts'
 
 const regions = new Intl.DisplayNames(['fr'], { type: 'region' })
 
@@ -32,21 +32,24 @@ export function flagSrc(code: string, base: string): string {
   return `https://flagcdn.com/24x18/${key}.png`
 }
 
-export async function fetchCountry(username: string, signal: AbortSignal): Promise<string | null> {
+/**
+ * Pays d'un joueur. Renvoie « » quand Chess.com n'en connaît pas (réponse définitive, à mémoriser)
+ * et lève une erreur quand la réponse est passagère (429, 5xx, réseau) : on ne mémorise rien dans ce cas.
+ */
+export async function fetchCountry(username: string, signal: AbortSignal): Promise<string> {
   return serial(() => readCountry(username, signal))
 }
 
-async function readCountry(username: string, signal: AbortSignal): Promise<string | null> {
-  let response: Response | null = null
-  for (let attempt = 0; attempt < 4; attempt += 1) {
-    response = await fetch(`https://api.chess.com/pub/player/${encodeURIComponent(username)}`, { signal })
-    if (response.status !== 429) break
-    const retry = Number(response.headers.get('retry-after'))
-    const wait = Number.isFinite(retry) && retry > 0 ? retry : 2 ** attempt
-    await new Promise((resolve) => setTimeout(resolve, wait * 1000))
-  }
-  if (!response || response.status === 404 || !response.ok) return null
-  const data = (await response.json()) as { country?: string }
+async function readCountry(username: string, signal: AbortSignal): Promise<string> {
+  const data = await readJson<{ country?: string }>(
+    `https://api.chess.com/pub/player/${encodeURIComponent(username)}`,
+    signal,
+    2,
+  ).catch((error: unknown) => {
+    if (error instanceof NotFoundError) return null
+    throw error
+  })
+  if (!data) return ''
   const code = (data.country || '').split('/').pop()?.toUpperCase() || ''
-  return /^[A-Z]{2}$/.test(code) ? code : null
+  return /^[A-Z]{2}$/.test(code) ? code : ''
 }
