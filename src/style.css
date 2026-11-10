@@ -197,6 +197,8 @@ button:disabled { opacity: 0.55; cursor: default; }
   padding: 0.45rem 0.7rem;
 }
 .loss-list button:hover { background: var(--paper-2); }
+.loss-list .instead { color: var(--win); font-weight: 650; }
+.repeats { margin-top: 0.9rem; }
 .score-head {
   color: var(--muted);
   padding: 0 0.7rem 0.3rem;

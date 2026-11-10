@@ -13,12 +13,14 @@ import {
   gamesOnLine,
   losingOpeningsAsync,
   nextRows,
+  repeatedMovesAsync,
   opponentRows,
   selectGames,
   tallyOf,
   winPercent,
   type ContRow,
   type LossRow,
+  type RepeatRow,
 } from './stats.ts'
 import type { Book, Filters, Finding, LightGame, Tally } from './types.ts'
 
@@ -77,6 +79,8 @@ let filterCache: { key: string; games: LightGame[] } | null = null
 let stepCache: { key: string; here: Tally; name: string; rows: ContRow[]; endings: { mate: number; resign: number; time: number } } | null = null
 let lossCache: { key: string; rows: LossRow[] | null } | null = null
 let lossJob = 0
+let repeatCache: { key: string; rows: RepeatRow[] | null } | null = null
+let repeatJob = 0
 let loadAbort: AbortController | null = null
 let countryAbort: AbortController | null = null
 let analysisJob = 0
@@ -311,6 +315,39 @@ function lossSection(): string {
   return `<section class="panel losses"><h2 class="icon-title" ${named('weak')}>${icons.trend}${pip}<span class="sr">${labels.weak}</span></h2>${list}</section>`
 }
 
+function repeatSection(): string {
+  const key = `${state.generation}|${state.filters.color}|${state.filters.tc}`
+  if (!repeatCache || repeatCache.key !== key) {
+    const job = ++repeatJob
+    repeatCache = { key, rows: null }
+    const games = selectGames(
+      state.games,
+      { ...state.filters, result: 'all', ending: 'all', country: null, opp: null },
+      state.countries,
+    )
+    const book = state.book
+    void repeatedMovesAsync(games, book, () => job !== repeatJob).then((rows) => {
+      if (job !== repeatJob || !rows || repeatCache?.key !== key) return
+      repeatCache = { key, rows }
+      render()
+    })
+  }
+  const rows = repeatCache.rows
+  if (!rows) {
+    return `<section class="panel repeats"><h2 class="icon-title" ${named('repeat')}>${icons.repeat}<span class="pip dot"></span><span class="sr">${labels.repeat}</span></h2></section>`
+  }
+  const list = rows.length
+    ? `<ul class="loss-list">${rows
+        .map((row) => {
+          const instead = row.instead ? `<span class="instead">→ ${esc(row.instead)}</span>` : ''
+          return `<li><button type="button" data-path="${esc(row.path.join('|'))}"><span class="name"><strong>${esc(row.move)}</strong> ${esc(row.name)} ${instead}</span><span class="n">${icons.pawn}${num(row.games)}</span>${gauge(row.score)}<span class="chev">${icons.chevron}</span></button></li>`
+        })
+        .join('')}</ul>`
+    : '<p class="muted">Pas encore vingt parties sur un coup plus faible.</p>'
+  const pip = rows.length ? `<span class="pip">${rows.length}</span>` : '<span class="pip dot"></span>'
+  return `<section class="panel repeats"><h2 class="icon-title" ${named('repeat')}>${icons.repeat}${pip}<span class="sr">${labels.repeat}</span></h2>${list}</section>`
+}
+
 function dashboard(): string {
   const { games, here: spot, name, rows, endings: lineEndings } = currentView()
   const tally = tallyOf(games)
@@ -396,6 +433,7 @@ function dashboard(): string {
         .join('')}
     </section>
     ${lossSection()}
+    ${repeatSection()}
     <div class="filters">
       <div class="seg" role="group" aria-label="Couleur">
         ${(['all', 'w', 'b'] as const)

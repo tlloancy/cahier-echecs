@@ -235,6 +235,102 @@ export async function losingOpeningsAsync(
   return stopped() ? null : lossRowsFrom(groups)
 }
 
+export interface RepeatRow {
+  path: string[]
+  move: string
+  instead: string
+  games: number
+  score: number
+  name: string
+}
+
+const REPEAT_PLY = 16
+const REPEAT_MIN = 20
+const ALT_MIN = 10
+const REPEAT_GAP = 8
+
+function addRepeat(buckets: Map<string, Map<string, Tally>>, game: LightGame): void {
+  const mine = game.color === 'w' ? 'white' : 'black'
+  const pos = Chess.default()
+  const walked: string[] = []
+  for (const san of playedLine(game).split(' ')) {
+    if (!san || walked.length >= REPEAT_PLY) break
+    const move = parseSan(pos, san)
+    if (!move) break
+    if (pos.turn === mine) {
+      const parent = walked.join('|')
+      let bucket = buckets.get(parent)
+      if (!bucket) {
+        bucket = new Map()
+        buckets.set(parent, bucket)
+      }
+      let tally = bucket.get(san)
+      if (!tally) {
+        tally = emptyTally()
+        bucket.set(san, tally)
+      }
+      addResult(tally, game.result)
+    }
+    pos.play(move)
+    walked.push(san)
+  }
+}
+
+function repeatRowsFrom(buckets: Map<string, Map<string, Tally>>, global: number, book: Book): RepeatRow[] {
+  const rows: RepeatRow[] = []
+  for (const [parent, bucket] of buckets) {
+    const moves = [...bucket.entries()].map(([move, tally]) => ({ move, tally, score: scorePercent(tally) }))
+    const best = moves
+      .filter((row) => row.tally.games >= ALT_MIN)
+      .sort((a, b) => b.score - a.score || b.tally.games - a.tally.games)[0]
+    for (const row of moves) {
+      if (row.tally.games < REPEAT_MIN) continue
+      const instead = best && best.move !== row.move && best.score >= row.score + REPEAT_GAP ? best.move : ''
+      if (!instead && row.score > global - REPEAT_GAP) continue
+      const path = parent ? [...parent.split('|'), row.move] : [row.move]
+      rows.push({ path, move: row.move, instead, games: row.tally.games, score: row.score, name: '' })
+    }
+  }
+  rows.sort((a, b) => b.games - a.games || a.score - b.score)
+  const kept = rows.slice(0, 8)
+  for (const row of kept) {
+    const pos = Chess.default()
+    let name = ''
+    for (const san of row.path) {
+      const move = parseSan(pos, san)
+      if (!move) break
+      pos.play(move)
+      const hit = book[epd(pos)]
+      if (hit) name = hit.name
+    }
+    row.name = name
+  }
+  return kept
+}
+
+export function repeatedMoves(games: LightGame[], book: Book): RepeatRow[] {
+  const buckets = new Map<string, Map<string, Tally>>()
+  for (const game of games) addRepeat(buckets, game)
+  return repeatRowsFrom(buckets, scorePercent(tallyOf(games)), book)
+}
+
+export async function repeatedMovesAsync(
+  games: LightGame[],
+  book: Book,
+  stopped: () => boolean = () => false,
+  slice = 200,
+): Promise<RepeatRow[] | null> {
+  const buckets = new Map<string, Map<string, Tally>>()
+  for (let i = 0; i < games.length; i += 1) {
+    addRepeat(buckets, games[i])
+    if ((i + 1) % slice === 0) {
+      await nextTurn()
+      if (stopped()) return null
+    }
+  }
+  return stopped() ? null : repeatRowsFrom(buckets, scorePercent(tallyOf(games)), book)
+}
+
 export function gamesOnLine(games: LightGame[], path: string[]): LightGame[] {
   return games.filter((game) => onLine(playedLine(game), path)).sort((a, b) => b.end - a.end)
 }

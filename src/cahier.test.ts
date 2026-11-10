@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { epd } from './book.ts'
 import { whiteCentipawns, type EngineScore } from './engine.ts'
 import { readLine } from './lighten.ts'
-import { losingOpenings, losingOpeningsAsync, nextRows, scorePercent } from './stats.ts'
+import { losingOpenings, losingOpeningsAsync, nextRows, repeatedMoves, scorePercent } from './stats.ts'
 import type { LightGame } from './types.ts'
 
 function game(patch: Partial<LightGame> & Pick<LightGame, 'id' | 'line' | 'result'>): LightGame {
@@ -78,6 +78,20 @@ describe('losingOpenings', () => {
     expect(shown[0].name).toBe('King’s Pawn')
     expect(shown[0].score).toBe(0)
     expect(shown[0].path).toEqual(['e4'])
+  })
+})
+
+describe('repeatedMoves', () => {
+  it('retient le coup souvent rejoué quand un autre coup au même moment marque mieux', () => {
+    const games: LightGame[] = []
+    for (let i = 0; i < 20; i += 1) games.push(game({ id: `bad${i}`, line: 'e4 e5 Nf3', moves: 'e4 e5 Nf3', result: 'l' }))
+    for (let i = 0; i < 10; i += 1) games.push(game({ id: `good${i}`, line: 'e4 e5 Nc3', moves: 'e4 e5 Nc3', result: 'w' }))
+    const rows = repeatedMoves(games, {})
+    const nf3 = rows.find((row) => row.move === 'Nf3')
+    expect(nf3?.games).toBe(20)
+    expect(nf3?.instead).toBe('Nc3')
+    expect(nf3?.path).toEqual(['e4', 'e5', 'Nf3'])
+    expect(rows.some((row) => row.move === 'e4')).toBe(false)
   })
 })
 

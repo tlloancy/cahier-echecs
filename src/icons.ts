@@ -41,4 +41,5 @@ export const icons = {
   out: svg('<path d="M12 14V4"/><path d="m8 7 4-4 4 4"/><path d="M5 14v5h14v-5"/>'),
   in: svg('<path d="M12 4v10"/><path d="m8 11 4 4 4-4"/><path d="M5 14v5h14v-5"/>'),
   play: svg('<path fill="currentColor" stroke="none" d="M8 5.8v12.4l10.2-6.2z"/>'),
+  repeat: svg('<path d="M4.5 12a7.5 7.5 0 1 0 2.1-5.3"/><path d="M4 4.2v4.2h4.2"/>'),
 }

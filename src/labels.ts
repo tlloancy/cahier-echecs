@@ -33,6 +33,7 @@ export const labels = {
   exportPins: 'Exporter les lignes',
   importPins: 'Importer des lignes',
   weak: 'Où je perds des points',
+  repeat: 'Le coup que je rejoue',
   opponent: 'Adversaire',
   demo: 'Exemple',
   user: 'Pseudo Chess.com',
