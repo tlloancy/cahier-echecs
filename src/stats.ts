@@ -72,8 +72,14 @@ export interface ContRow extends Tally {
   time: number
 }
 
-export function nextRows(games: LightGame[], path: string[], book: Book): { here: Tally; name: string; rows: ContRow[] } {
+export function nextRows(games: LightGame[], path: string[], book: Book): {
+  here: Tally
+  name: string
+  rows: ContRow[]
+  endings: { mate: number; resign: number; time: number }
+} {
   const here = emptyTally()
+  const endings = { mate: 0, resign: 0, time: 0 }
   const map = new Map<string, ContRow>()
   const prefix = path.join(' ')
   const mark = prefix ? `${prefix} ` : ''
@@ -81,6 +87,7 @@ export function nextRows(games: LightGame[], path: string[], book: Book): { here
     const line = playedLine(game)
     if (prefix && line !== prefix && !line.startsWith(mark)) continue
     addResult(here, game.result)
+    if (game.how === 'mate' || game.how === 'resign' || game.how === 'time') endings[game.how] += 1
     let next = ''
     if (!prefix) {
       if (!line) continue
@@ -118,7 +125,7 @@ export function nextRows(games: LightGame[], path: string[], book: Book): { here
     const hit = book[epd(branch)]
     row.name = hit?.name || name
   }
-  return { here, name, rows }
+  return { here, name, rows, endings }
 }
 
 export interface LossRow {

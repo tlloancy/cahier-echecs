@@ -74,7 +74,7 @@ const state: {
 }
 
 let filterCache: { key: string; games: LightGame[] } | null = null
-let stepCache: { key: string; here: Tally; name: string; rows: ContRow[] } | null = null
+let stepCache: { key: string; here: Tally; name: string; rows: ContRow[]; endings: { mate: number; resign: number; time: number } } | null = null
 let lossCache: { key: string; rows: LossRow[] | null } | null = null
 let lossJob = 0
 let loadAbort: AbortController | null = null
@@ -149,7 +149,13 @@ function filterKey(): string {
   return `${state.generation}|${state.filters.color}|${state.filters.tc}|${state.filters.result}|${state.filters.ending}|${state.filters.country || ''}|${state.filters.opp || ''}`
 }
 
-function currentView(): { games: LightGame[]; here: Tally; name: string; rows: ContRow[] } {
+function currentView(): {
+  games: LightGame[]
+  here: Tally
+  name: string
+  rows: ContRow[]
+  endings: { mate: number; resign: number; time: number }
+} {
   const key = filterKey()
   if (!filterCache || filterCache.key !== key) {
     filterCache = { key, games: selectGames(state.games, state.filters, state.countries) }
@@ -157,9 +163,13 @@ function currentView(): { games: LightGame[]; here: Tally; name: string; rows: C
   const stepKey = `${key}|${state.path.join('|')}`
   if (!stepCache || stepCache.key !== stepKey) {
     const step = nextRows(filterCache.games, state.path, state.book)
-    stepCache = { key: stepKey, here: step.here, name: step.name, rows: step.rows }
+    stepCache = { key: stepKey, here: step.here, name: step.name, rows: step.rows, endings: step.endings }
   }
-  return { games: filterCache.games, here: stepCache.here, name: stepCache.name, rows: stepCache.rows }
+  return { games: filterCache.games, here: stepCache.here, name: stepCache.name, rows: stepCache.rows, endings: stepCache.endings }
+}
+
+function endsHtml(endings: { mate: number; resign: number; time: number }): string {
+  return `<span class="ends"><span><span class="glyph">#</span>${num(endings.mate)}</span><span>${icons.flag}${num(endings.resign)}</span><span>${icons.hourglass}${num(endings.time)}</span></span>`
 }
 
 function share(part: number, whole: number): number {
@@ -287,7 +297,7 @@ function lossSection(): string {
 }
 
 function dashboard(): string {
-  const { games, here: spot, name, rows } = currentView()
+  const { games, here: spot, name, rows, endings: lineEndings } = currentView()
   const tally = tallyOf(games)
   const children = rows
   const here = pathKey(state.path)
@@ -319,7 +329,6 @@ function dashboard(): string {
               <span class="san">${esc(child.move)}</span>
               <span class="name">${esc(child.name)}</span>
               <span class="n">${icons.pawn}${num(child.games)}</span>
-              <span class="ends"><span><span class="glyph">#</span>${num(child.mate)}</span><span>${icons.flag}${num(child.resign)}</span><span>${icons.hourglass}${num(child.time)}</span></span>
               ${gauge(shownScore(child, spot.games))}
               ${bar(child, spot.games)}
               <span class="chev">${icons.chevron}</span>
@@ -330,7 +339,7 @@ function dashboard(): string {
         .join('')
     : '<p class="muted">Pas de coup suivant dans cette sélection.</p>'
   const treeHead = children.length
-    ? `<div class="tree-line head"><div class="tree-head" aria-hidden="true"><span></span><span></span><span>${icons.pawn}</span><span class="ends"><span>#</span><span>${icons.flag}</span><span>${icons.hourglass}</span></span><span>${icons.meter}</span><span class="bar-slot"></span><span></span></div><span></span></div>`
+    ? `<div class="tree-line head"><div class="tree-head" aria-hidden="true"><span></span><span></span><span>${icons.pawn}</span><span>${icons.meter}</span><span class="bar-slot"></span><span></span></div><span></span></div>`
     : ''
   const pins = state.pins.length
     ? `<ul class="pin-list">${state.pins
@@ -421,6 +430,7 @@ function dashboard(): string {
       <section class="panel">
         <div class="toolbar">
           <h2>${name ? esc(name) : 'Ouvertures'}</h2>
+          ${endsHtml(lineEndings)}
           <span class="toolbar-actions">
             ${state.path.length ? `<button type="button" class="icon pin" id="pin-here" aria-pressed="${pinnedHere ? 'true' : 'false'}" ${named(pinnedHere ? 'unpinLine' : 'pinLine')}>${icons.pin}</button>` : ''}
             ${state.path.length && !state.analysis?.running ? `<button type="button" class="icon" id="analyze" ${named('analyze')}>${icons.eval}</button>` : ''}
@@ -1159,7 +1169,7 @@ async function boot(): Promise<void> {
     let shown = 0
     state.book = await loadBook((ratio) => {
       const pct = Math.min(100, Math.round(ratio * 100))
-      setProgress(ratio)
+      setProgress(ratio * 0.08)
       if (pct === shown) return
       shown = pct
       setMessage(`Livre d’ouvertures · ${pct} %`)
@@ -1180,12 +1190,13 @@ async function boot(): Promise<void> {
   }
   if (last) {
     let shown = -1
-    state.progress = 0
-    setProgress(0)
+    state.progress = 0.08
+    setProgress(0.08)
     setMessage('Parties enregistrées · 0 %')
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
     await restore(last, (ratio) => {
       const pct = Math.min(100, Math.round(ratio * 100))
-      setProgress(ratio)
+      setProgress(0.08 + ratio * 0.92)
       if (pct === shown) return
       shown = pct
       setMessage(`Parties enregistrées · ${pct} %`)
