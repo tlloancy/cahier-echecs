@@ -226,6 +226,12 @@ function signal(kind: 'faille' | 'decisif', cpl: number): { tone: string; glyph:
   return { tone: 'mistake', glyph: '?', name: 'Erreur' }
 }
 
+function timesPlayed(full: string, ply: number): number {
+  const path = full.split(' ').filter(Boolean).slice(0, ply)
+  if (!path.length) return 0
+  return gamesOnLine(currentView().games, path).length
+}
+
 function findingList(mark: string, label: string, rows: Finding[], empty: string, kind: 'faille' | 'decisif'): string {
   if (!rows.length && !empty) return ''
   const items = rows.length
@@ -238,7 +244,8 @@ function findingList(mark: string, label: string, rows: Finding[], empty: string
           const sign = signal(kind, row.cpl)
           const detail = kind === 'faille' ? `${moveLabel(row.ply, row.san)} → ${row.best}` : moveLabel(row.ply, row.san)
           const loss = kind === 'faille' ? `<span class="loss ${sign.tone}">−${num(row.cpl)}</span>` : ''
-          return `<li><button type="button" class="finding" data-line="${esc(row.line)}" data-ply="${row.ply}"><span class="mark-move ${sign.tone}" data-tip-text="${esc(sign.name)}">${sign.glyph}</span><span>${esc(detail)}</span>${loss}<span class="muted">${esc(row.opp)}</span></button>${link}</li>`
+          const times = `<span class="n" ${named('games')}>${icons.pawn}${num(timesPlayed(row.line, row.ply))}</span>`
+          return `<li><button type="button" class="finding" data-line="${esc(row.line)}" data-ply="${row.ply}"><span class="mark-move ${sign.tone}" data-tip-text="${esc(sign.name)}">${sign.glyph}</span><span class="finding-line"><span>${esc(detail)}</span>${times}</span>${loss}<span class="muted">${esc(row.opp)}</span></button>${link}</li>`
         })
         .join('')
     : `<li class="muted">${esc(empty)}</li>`
