@@ -319,6 +319,7 @@ function dashboard(): string {
               <span class="san">${esc(child.move)}</span>
               <span class="name">${esc(child.name)}</span>
               <span class="n">${icons.pawn}${num(child.games)}</span>
+              <span class="ends"><span><span class="glyph">#</span>${num(child.mate)}</span><span>${icons.flag}${num(child.resign)}</span><span>${icons.hourglass}${num(child.time)}</span></span>
               ${gauge(shownScore(child, spot.games))}
               ${bar(child, spot.games)}
               <span class="chev">${icons.chevron}</span>
@@ -329,7 +330,7 @@ function dashboard(): string {
         .join('')
     : '<p class="muted">Pas de coup suivant dans cette sélection.</p>'
   const treeHead = children.length
-    ? `<div class="tree-line head"><div class="tree-head" aria-hidden="true"><span></span><span></span><span>${icons.pawn}</span><span>${icons.meter}</span><span class="bar-slot"></span><span></span></div><span></span></div>`
+    ? `<div class="tree-line head"><div class="tree-head" aria-hidden="true"><span></span><span></span><span>${icons.pawn}</span><span class="ends"><span>#</span><span>${icons.flag}</span><span>${icons.hourglass}</span></span><span>${icons.meter}</span><span class="bar-slot"></span><span></span></div><span></span></div>`
     : ''
   const pins = state.pins.length
     ? `<ul class="pin-list">${state.pins

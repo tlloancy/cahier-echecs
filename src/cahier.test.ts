@@ -52,6 +52,7 @@ describe('nextRows', () => {
     expect(step.here.games).toBe(2)
     expect(step.rows.map((row) => row.move)).toEqual(['c5', 'e5'])
     expect(step.rows.find((row) => row.move === 'e5')?.l).toBe(1)
+    expect(step.rows.find((row) => row.move === 'e5')).toMatchObject({ mate: 1, resign: 0, time: 0 })
   })
 })
 

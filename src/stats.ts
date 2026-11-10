@@ -67,6 +67,9 @@ export function playedLine(game: LightGame): string {
 export interface ContRow extends Tally {
   move: string
   name: string
+  mate: number
+  resign: number
+  time: number
 }
 
 export function nextRows(games: LightGame[], path: string[], book: Book): { here: Tally; name: string; rows: ContRow[] } {
@@ -91,10 +94,11 @@ export function nextRows(games: LightGame[], path: string[], book: Book): { here
     if (!next) continue
     let row = map.get(next)
     if (!row) {
-      row = { move: next, name: '', games: 0, w: 0, d: 0, l: 0 }
+      row = { move: next, name: '', games: 0, w: 0, d: 0, l: 0, mate: 0, resign: 0, time: 0 }
       map.set(next, row)
     }
     addResult(row, game.result)
+    if (game.how === 'mate' || game.how === 'resign' || game.how === 'time') row[game.how] += 1
   }
   const rows = [...map.values()].sort((a, b) => b.games - a.games || a.move.localeCompare(b.move, 'fr'))
   const pos = Chess.default()
