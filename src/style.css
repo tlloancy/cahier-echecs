@@ -515,17 +515,36 @@ button.icon[aria-pressed="true"] .ico.tc-daily { color: inherit; }
 .finding-list li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.35rem; align-items: center; }
 .finding {
   display: grid;
-  grid-template-columns: auto auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
   gap: 0.45rem;
   width: 100%;
   text-align: left;
+  align-items: center;
   background: transparent;
   border: 0;
   border-radius: 8px;
   padding: 0.35rem 0.2rem;
 }
 .finding:hover { background: var(--paper-2); }
+.mark-move {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.7rem;
+  height: 1.35rem;
+  padding: 0 0.28rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+.mark-move.mistake { color: #8a4e08; background: #f3ddb4; }
+.mark-move.blunder { color: #fffdf9; background: var(--loss); }
+.mark-move.collapse { color: #fffdf9; background: #5c1410; }
+.mark-move.brilliant { color: #083b38; background: #b7e3de; }
 .loss { color: var(--wax); font-variant-numeric: tabular-nums; }
+.loss.mistake { color: #8a4e08; }
+.loss.blunder { color: var(--loss); font-weight: 650; }
+.loss.collapse { color: #5c1410; font-weight: 750; }
 .icon-link { display: grid; place-items: center; width: 2rem; height: 2rem; color: var(--ink); }
 .opp-list { max-height: min(70vh, 44rem); overflow: auto; }
 

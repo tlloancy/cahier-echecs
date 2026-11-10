@@ -219,6 +219,13 @@ function moveLabel(ply: number, san: string): string {
   return ply % 2 === 1 ? `${move}. ${san}` : `${move}… ${san}`
 }
 
+function signal(kind: 'faille' | 'decisif', cpl: number): { tone: string; glyph: string; name: string } {
+  if (kind === 'decisif') return { tone: 'brilliant', glyph: '!!', name: 'Brillant' }
+  if (cpl >= 1000) return { tone: 'collapse', glyph: '??', name: 'Position perdue' }
+  if (cpl >= 300) return { tone: 'blunder', glyph: '??', name: 'Gaffe' }
+  return { tone: 'mistake', glyph: '?', name: 'Erreur' }
+}
+
 function findingList(mark: string, label: string, rows: Finding[], empty: string, kind: 'faille' | 'decisif'): string {
   if (!rows.length && !empty) return ''
   const items = rows.length
@@ -228,9 +235,10 @@ function findingList(mark: string, label: string, rows: Finding[], empty: string
           const link = href
             ? `<a class="icon-link" href="${esc(href)}" target="_blank" rel="noreferrer" ${named('game', row.opp)}>${icons.link}</a>`
             : ''
+          const sign = signal(kind, row.cpl)
           const detail = kind === 'faille' ? `${moveLabel(row.ply, row.san)} → ${row.best}` : moveLabel(row.ply, row.san)
-          const loss = kind === 'faille' ? `<span class="loss">−${num(row.cpl)}</span>` : ''
-          return `<li><button type="button" class="finding" data-line="${esc(row.line)}" data-ply="${row.ply}"><span>${esc(detail)}</span>${loss}<span class="muted">${esc(row.opp)}</span></button>${link}</li>`
+          const loss = kind === 'faille' ? `<span class="loss ${sign.tone}">−${num(row.cpl)}</span>` : ''
+          return `<li><button type="button" class="finding" data-line="${esc(row.line)}" data-ply="${row.ply}"><span class="mark-move ${sign.tone}" data-tip-text="${esc(sign.name)}">${sign.glyph}</span><span>${esc(detail)}</span>${loss}<span class="muted">${esc(row.opp)}</span></button>${link}</li>`
         })
         .join('')
     : `<li class="muted">${esc(empty)}</li>`
