@@ -93,6 +93,15 @@ describe('repeatedMoves', () => {
     expect(nf3?.path).toEqual(['e4', 'e5', 'Nf3'])
     expect(rows.some((row) => row.move === 'e4')).toBe(false)
   })
+
+  it('laisse de côté un coup souvent joué quand il marque mieux que le joueur', () => {
+    const games: LightGame[] = []
+    for (let i = 0; i < 30; i += 1) games.push(game({ id: `win${i}`, line: 'e4 e5 Nf3', moves: 'e4 e5 Nf3', result: 'w' }))
+    for (let i = 0; i < 20; i += 1) games.push(game({ id: `loss${i}`, line: 'e4 e5 Nc3', moves: 'e4 e5 Nc3', result: 'l' }))
+    const rows = repeatedMoves(games, {})
+    expect(rows.some((row) => row.move === 'Nf3')).toBe(false)
+    expect(rows.find((row) => row.move === 'Nc3')?.games).toBe(20)
+  })
 })
 
 describe('whiteCentipawns', () => {

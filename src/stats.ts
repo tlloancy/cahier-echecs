@@ -285,8 +285,8 @@ function repeatRowsFrom(buckets: Map<string, Map<string, Tally>>, global: number
       .sort((a, b) => b.score - a.score || b.tally.games - a.tally.games)[0]
     for (const row of moves) {
       if (row.tally.games < REPEAT_MIN) continue
+      if (row.score > global - REPEAT_GAP) continue
       const instead = best && best.move !== row.move && best.score >= row.score + REPEAT_GAP ? best.move : ''
-      if (!instead && row.score > global - REPEAT_GAP) continue
       const path = parent ? [...parent.split('|'), row.move] : [row.move]
       rows.push({ path, move: row.move, instead, games: row.tally.games, score: row.score, name: '' })
     }
