@@ -1195,8 +1195,8 @@ async function boot(): Promise<void> {
     setMessage('Parties enregistrées · 0 %')
     await new Promise((resolve) => requestAnimationFrame(() => resolve(undefined)))
     await restore(last, (ratio) => {
-      const pct = Math.min(100, Math.round(ratio * 100))
-      setProgress(0.08 + ratio * 0.92)
+      const pct = Math.min(99, Math.round(ratio * 100))
+      setProgress(0.08 + Math.min(0.99, ratio) * 0.92)
       if (pct === shown) return
       shown = pct
       setMessage(`Parties enregistrées · ${pct} %`)
@@ -1205,10 +1205,13 @@ async function boot(): Promise<void> {
   }
   else if (!unsaved()) state.message = ''
   if (unsaved()) state.message = 'Mode sans sauvegarde'
-  await rememberCountries()
+  state.progress = null
   state.phase = state.games.length ? 'ready' : 'idle'
   render()
-  if (state.games.length) void fillBackground()
+  if (state.games.length) {
+    void rememberCountries().then(() => render())
+    void fillBackground()
+  }
 }
 
 void boot()
